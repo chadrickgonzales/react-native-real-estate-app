@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "real_estate_app",
-    "slug": "real_estate_app",
+    "name": "EstateLink",
+    "slug": "EstateLink",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "realestateapp",
+    "scheme": "EstateLink",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
