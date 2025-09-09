@@ -2,23 +2,33 @@ import { Card, FeaturedCard } from "@/components/Cards";
 import Filters from "@/components/Filters";
 import Search from "@/components/search";
 import icons from "@/constants/icons";
-import images from "@/constants/images";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { useGlobalContext } from "@/lib/global-provider";
+import { FlatList, Image, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Index() {
+  const {user} = useGlobalContext();
+
   return (
     <SafeAreaView className="bg-white h-full">
-      
-      <View className="px-5">
+      <FlatList
+        data={[1,2]}
+        renderItem={({item}) => <Card/>}
+        keyExtractor={(item)=> item.toString()}
+        numColumns={2}
+        contentContainerClassName="pb-32"
+        columnWrapperClassName="flex gap-5 px-5"
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View className="px-5">
         
         <View className="flex flex-row justify-between mt-5">
           
           <View className="flex flex-row itemes-center">
-            <Image source= {images.avatar} className="size-12 rounded-full" />            
+            <Image source= {{uri: user?.avatar}} className="size-12 rounded-full" />            
             <View className="flex flex-col items-start ml-2 justify-center">
                 <Text className="text-sx font-rubik text-black-100">Good Morning</Text>
-                <Text className="text-base font-rubik-medium text-black-300">John Doe</Text>
+                <Text className="text-base font-rubik-medium text-black-300">{user?.name}</Text>
             </View>
           </View>
 
@@ -34,16 +44,19 @@ export default function Index() {
             <TouchableOpacity>
               <Text className="text-base font-rubik-bold text-primary-300">See All</Text>
             </TouchableOpacity>
-
-
           </View>
 
-          <View className="flex flex-row gap-5 mt-5">
-            <FeaturedCard/>
-            <FeaturedCard/>
-            <FeaturedCard/>
+            <FlatList
+              data={[1,2]}
+              renderItem={({item}) => < FeaturedCard/>}
+              keyExtractor={(item) => item.toString()} 
+              horizontal
+              bounces={false}
+              showsHorizontalScrollIndicator={false}
+              contentContainerClassName="flex gap-5 mt-5"
+            />
 
-          </View>
+         
 
           <View className="flex flex-row items-center justify-between mt-5">
 
@@ -56,16 +69,16 @@ export default function Index() {
 
           <Filters/>
 
-          <View className="flex flex-row gap-5 mt-5">
-            <Card/>
-            <Card/>
-
-          </View>
+         
 
         </View>
 
        
       </View>
+        }
+      />
+      
+      
 
     </SafeAreaView>
   );
