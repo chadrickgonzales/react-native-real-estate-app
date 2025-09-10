@@ -153,12 +153,91 @@ export async function getProperties({
 // write function to get property by id
 export async function getPropertyById({ id }: { id: string }) {
   try {
-    const result = await databases.getDocument(
+    const property: any = await databases.getDocument(
       config.databaseId!,
       config.propertiesCollectionId!,
       id
     );
-    return result;
+
+    if (!property) return null;
+
+    const originalReviews = Array.isArray(property.reviews)
+      ? property.reviews
+      : [];
+    const originalGallery = Array.isArray(property.gallery)
+      ? property.gallery
+      : [];
+
+    // Resolve agent relation if it's an ID
+    let resolvedAgent = property.agent;
+    if (resolvedAgent && typeof resolvedAgent === "string") {
+      try {
+        resolvedAgent = await databases.getDocument(
+          config.databaseId!,
+          config.agentsCollectionId!,
+          resolvedAgent
+        );
+      } catch {}
+    }
+
+    // Resolve gallery documents if they are IDs
+    let resolvedGallery = property.gallery;
+    if (Array.isArray(resolvedGallery)) {
+      const galleryItems = await Promise.all(
+        resolvedGallery.map(async (item: any) => {
+          if (item && typeof item === "string") {
+            try {
+              return await databases.getDocument(
+                config.databaseId!,
+                config.galleriesCollectionId!,
+                item
+              );
+            } catch {
+              return null;
+            }
+          }
+          return item; // already an object
+        })
+      );
+      resolvedGallery = galleryItems.filter(Boolean);
+    }
+
+    // Resolve review documents if they are IDs
+    let resolvedReviews = property.reviews;
+    if (Array.isArray(resolvedReviews)) {
+      const reviewItems = await Promise.all(
+        resolvedReviews.map(async (item: any) => {
+          if (item && typeof item === "string") {
+            try {
+              return await databases.getDocument(
+                config.databaseId!,
+                config.reviewsCollectionId!,
+                item
+              );
+            } catch {
+              return null;
+            }
+          }
+          return item; // already an object
+        })
+      );
+      resolvedReviews = reviewItems.filter(Boolean);
+    }
+
+    return {
+      ...property,
+      agent: resolvedAgent,
+      gallery: resolvedGallery,
+      reviews: resolvedReviews,
+      reviewsCount:
+        Array.isArray(resolvedReviews) && resolvedReviews.length > 0
+          ? resolvedReviews.length
+          : originalReviews.length,
+      galleryCount:
+        Array.isArray(resolvedGallery) && resolvedGallery.length > 0
+          ? resolvedGallery.length
+          : originalGallery.length,
+    };
   } catch (error) {
     console.error(error);
     return null;
