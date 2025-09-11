@@ -60,10 +60,30 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Explore",
+          title: "Search",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={icons.search} title="Explore" />
+            <TabIcon focused={focused} icon={icons.search} title="Search" />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Chat",
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon={icons.chat} title="Chat" />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="saved"
+        options={{
+          title: "Saved",
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon={icons.heart} title="Saved" />
           ),
         }}
       />
