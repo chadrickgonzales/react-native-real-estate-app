@@ -13,69 +13,56 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-interface FormData {
-  email: string
-  password: string
-}
-
-interface FormErrors {
-  email?: string
-  password?: string
-}
-
 export default function Login() {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
-  const [errors, setErrors] = useState<FormErrors>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
 
   const validateForm = () => {
-    const newErrors: FormErrors = {}
-    
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email'
+      Alert.alert('Error', 'Please enter your email')
+      return false
     }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required'
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      Alert.alert('Error', 'Please enter a valid email address')
+      return false
     }
-    
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    if (!formData.password.trim()) {
+      Alert.alert('Error', 'Please enter your password')
+      return false
+    }
+    return true
   }
 
   const handleLogin = async () => {
-    if (validateForm()) {
-      setIsLoading(true)
-      
-      // Simulate API call
-      setTimeout(() => {
-        setIsLoading(false)
-        // Here you would typically handle the login logic
-        Alert.alert('Success', 'Login successful!', [
-          { text: 'OK', onPress: () => router.push('/(root)/(tabs)') }
-        ])
-      }, 1500)
-    }
-  }
-
-  const updateFormData = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
+    if (!validateForm()) return
+    
+    setIsLoading(true)
+    try {
+      // TODO: Implement actual login logic here
+      console.log('Login data:', formData)
+      Alert.alert('Success', 'Login successful!', [
+        { text: 'OK', onPress: () => router.push('/(root)/(tabs)') }
+      ])
+    } catch {
+      Alert.alert('Error', 'Invalid email or password. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleForgotPassword = () => {
     Alert.alert(
       'Forgot Password',
-      'Password reset functionality would be implemented here.',
+      'Password reset functionality will be implemented here.',
       [{ text: 'OK' }]
     )
   }
@@ -92,7 +79,7 @@ export default function Login() {
           contentContainerStyle={{ paddingBottom: 20 }}
         >
           {/* Header */}
-          <View className="mt-12 mb-8">
+          <View className="mt-8 mb-8">
             <Text className="text-3xl font-rubik-bold text-black-300 text-center">
               Welcome Back
             </Text>
@@ -103,91 +90,83 @@ export default function Login() {
 
           {/* Form */}
           <View className="space-y-4">
-            {/* Email Field */}
+            {/* Email Input */}
             <View>
               <Text className="text-sm font-rubik-medium text-black-300 mb-2">
                 Email Address
               </Text>
-              <View className="relative">
+              <View className="flex-row items-center bg-accent-100 rounded-xl px-4 py-4 border border-gray-200">
+                <Ionicons name="mail-outline" size={20} color="#666876" />
                 <TextInput
-                  className={`bg-accent-100 border-2 rounded-xl px-4 py-4 text-base font-rubik ${
-                    errors.email ? 'border-danger' : 'border-transparent'
-                  }`}
+                  className="flex-1 ml-3 text-base font-rubik text-black-300"
                   placeholder="Enter your email"
                   placeholderTextColor="#8c8e98"
+                  value={formData.email}
+                  onChangeText={(value) => handleInputChange('email', value)}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  value={formData.email}
-                  onChangeText={(value) => updateFormData('email', value)}
-                />
-                <Ionicons 
-                  name="mail-outline" 
-                  size={20} 
-                  color="#8c8e98" 
-                  className="absolute right-4 top-4"
                 />
               </View>
-              {errors.email && (
-                <Text className="text-danger text-sm font-rubik mt-1">
-                  {errors.email}
-                </Text>
-              )}
             </View>
 
-            {/* Password Field */}
+            {/* Password Input */}
             <View>
               <Text className="text-sm font-rubik-medium text-black-300 mb-2">
                 Password
               </Text>
-              <View className="relative">
+              <View className="flex-row items-center bg-accent-100 rounded-xl px-4 py-4 border border-gray-200">
+                <Ionicons name="lock-closed-outline" size={20} color="#666876" />
                 <TextInput
-                  className={`bg-accent-100 border-2 rounded-xl px-4 py-4 text-base font-rubik pr-12 ${
-                    errors.password ? 'border-danger' : 'border-transparent'
-                  }`}
+                  className="flex-1 ml-3 text-base font-rubik text-black-300"
                   placeholder="Enter your password"
                   placeholderTextColor="#8c8e98"
-                  secureTextEntry={!showPassword}
                   value={formData.password}
-                  onChangeText={(value) => updateFormData('password', value)}
+                  onChangeText={(value) => handleInputChange('password', value)}
+                  secureTextEntry={!showPassword}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-4"
-                >
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                   <Ionicons 
-                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
                     size={20} 
-                    color="#8c8e98" 
+                    color="#666876" 
                   />
                 </TouchableOpacity>
               </View>
-              {errors.password && (
-                <Text className="text-danger text-sm font-rubik mt-1">
-                  {errors.password}
-                </Text>
-              )}
             </View>
           </View>
 
-          {/* Forgot Password */}
-          <TouchableOpacity 
-            onPress={handleForgotPassword}
-            className="self-end mt-2"
-          >
-            <Text className="text-primary-300 text-sm font-rubik-medium">
-              Forgot Password?
-            </Text>
-          </TouchableOpacity>
+          {/* Remember Me & Forgot Password */}
+          <View className="flex-row items-center justify-between mt-4">
+            <TouchableOpacity 
+              className="flex-row items-center"
+              onPress={() => setRememberMe(!rememberMe)}
+            >
+              <View className={`w-5 h-5 rounded border-2 mr-2 items-center justify-center ${
+                rememberMe ? 'bg-primary-300 border-primary-300' : 'border-gray-300'
+              }`}>
+                {rememberMe && (
+                  <Ionicons name="checkmark" size={12} color="white" />
+                )}
+              </View>
+              <Text className="text-sm font-rubik text-black-200">
+                Remember me
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleForgotPassword}>
+              <Text className="text-sm font-rubik-medium text-primary-300">
+                Forgot Password?
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Login Button */}
           <TouchableOpacity
+            className={`mt-8 py-4 rounded-xl ${
+              isLoading ? 'bg-primary-200' : 'bg-primary-300'
+            }`}
             onPress={handleLogin}
             disabled={isLoading}
-            className={`rounded-xl py-4 mt-6 shadow-lg ${
-              isLoading 
-                ? 'bg-black-100' 
-                : 'bg-primary-300 shadow-primary-300/30'
-            }`}
           >
             <Text className="text-white text-lg font-rubik-bold text-center">
               {isLoading ? 'Signing In...' : 'Sign In'}
@@ -195,40 +174,40 @@ export default function Login() {
           </TouchableOpacity>
 
           {/* Divider */}
-          <View className="flex-row items-center my-6">
-            <View className="flex-1 h-px bg-black-100" />
-            <Text className="mx-4 text-black-200 font-rubik">or</Text>
-            <View className="flex-1 h-px bg-black-100" />
+          <View className="flex-row items-center mt-8 mb-6">
+            <View className="flex-1 h-px bg-gray-200" />
+            <Text className="mx-4 text-sm font-rubik text-black-200">
+              Or continue with
+            </Text>
+            <View className="flex-1 h-px bg-gray-200" />
           </View>
 
-          {/* Social Login */}
-          <TouchableOpacity className="bg-white border-2 border-black-100 rounded-xl py-4 flex-row items-center justify-center">
-            <Ionicons name="logo-google" size={20} color="#0061ff" />
-            <Text className="text-black-300 text-lg font-rubik-medium ml-3">
-              Continue with Google
-            </Text>
-          </TouchableOpacity>
+          {/* Social Login Buttons */}
+          <View className="space-y-3">
+            <TouchableOpacity className="flex-row items-center justify-center py-4 rounded-xl border border-gray-200 bg-white">
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
+              <Text className="ml-3 text-base font-rubik-medium text-black-300">
+                Continue with Google
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity className="flex-row items-center justify-center py-4 rounded-xl border border-gray-200 bg-white">
+              <Ionicons name="logo-apple" size={20} color="#000000" />
+              <Text className="ml-3 text-base font-rubik-medium text-black-300">
+                Continue with Apple
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Sign Up Link */}
-          <View className="flex-row justify-center items-center mt-8">
-            <Text className="text-black-200 font-rubik">
+          <View className="flex-row items-center justify-center mt-8">
+            <Text className="text-base font-rubik text-black-200">
               Don&apos;t have an account?{' '}
             </Text>
             <Link href="/signin1" asChild>
               <TouchableOpacity>
-                <Text className="text-primary-300 font-rubik-bold">
+                <Text className="text-base font-rubik-bold text-primary-300">
                   Sign Up
-                </Text>
-              </TouchableOpacity>
-            </Link>
-          </View>
-
-          {/* Back to Home */}
-          <View className="flex-row justify-center items-center mt-4">
-            <Link href="/signin" asChild>
-              <TouchableOpacity>
-                <Text className="text-black-100 font-rubik text-sm">
-                  ← Back to Welcome
                 </Text>
               </TouchableOpacity>
             </Link>
