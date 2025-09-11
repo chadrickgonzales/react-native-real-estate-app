@@ -33,6 +33,16 @@ Your collection is already set up with the following attributes:
 | email | String | Yes | - | No |
 | password | String | Yes | 1000 | No |
 
+**Additional fields for account setup (add these to your collection):**
+
+| Attribute | Type | Required | Size | Array |
+|-----------|------|----------|------|-------|
+| phoneNumber | String | No | 20 | No |
+| location | String | No | 100 | No |
+| preferences | String | No | 1000 | No | (JSON string of user preferences) |
+| bio | String | No | 1000 | No |
+| setupCompleted | Boolean | No | - | No |
+
 ### Permissions
 
 Set the following permissions for the Users collection:

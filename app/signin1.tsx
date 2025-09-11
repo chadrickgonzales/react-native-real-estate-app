@@ -71,7 +71,7 @@ export default function Signin1() {
         // Refetch user data to update global state
         refetch()
         Alert.alert('Success', 'Account created successfully!', [
-          { text: 'OK', onPress: () => router.push('/(root)/(tabs)') }
+          { text: 'OK', onPress: () => router.push('/account-setup') }
         ])
       }
     } catch (error: any) {

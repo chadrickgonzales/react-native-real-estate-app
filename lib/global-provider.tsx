@@ -12,9 +12,18 @@ interface GlobalContextType {
 
 interface User {
   $id: string;
-  name: string;
+  userName: string;
   email: string;
-  avatar: string;
+  password: string;
+  phoneNumber?: string;
+  location?: string;
+  preferences?: {
+    propertyType?: string;
+    budget?: string;
+    bedrooms?: string;
+  };
+  bio?: string;
+  setupCompleted?: boolean;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);

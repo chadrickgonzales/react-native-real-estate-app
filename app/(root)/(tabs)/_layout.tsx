@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { Image, ImageSourcePropType, Text, View } from "react-native";
 
+import SetupGuard from "@/components/SetupGuard";
 import icons from "@/constants/icons";
 
 const TabIcon = ({
@@ -33,18 +34,19 @@ const TabIcon = ({
 
 const TabsLayout = () => {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarShowLabel: false,
-        tabBarStyle: {
-          backgroundColor: "white",
-          position: "absolute",
-          borderTopColor: "#0061FF1A",
-          borderTopWidth: 1,
-          minHeight: 70,
-        },
-      }}
-    >
+    <SetupGuard>
+      <Tabs
+        screenOptions={{
+          tabBarShowLabel: false,
+          tabBarStyle: {
+            backgroundColor: "white",
+            position: "absolute",
+            borderTopColor: "#0061FF1A",
+            borderTopWidth: 1,
+            minHeight: 70,
+          },
+        }}
+      >
       <Tabs.Screen
         name="index"
         options={{
@@ -75,7 +77,8 @@ const TabsLayout = () => {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+    </SetupGuard>
   );
 };
 

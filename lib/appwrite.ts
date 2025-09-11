@@ -96,19 +96,78 @@ export async function signIn({
   }
 }
 
+export async function updateUserProfile({
+  userId,
+  profileData,
+}: {
+  userId: string;
+  profileData: {
+    phoneNumber?: string;
+    location?: string;
+    preferences?: string;
+    bio?: string;
+    setupCompleted?: boolean;
+  };
+}) {
+  try {
+    const result = await databases.updateDocument(
+      config.databaseId!,
+      config.usersCollectionId!,
+      userId,
+      profileData
+    );
+    return result;
+  } catch (error) {
+    console.error("Update profile error:", error);
+    throw error;
+  }
+}
+
 export async function getCurrentUser() {
   try {
-    const result = await account.get();
-    if (result.$id) {
-      const userAvatar = avatar.getInitials(result.name);
+    const authAccount = await account.get();
+    if (!authAccount.$id) return null;
 
-      return {
-        ...result,
-        avatar: userAvatar.toString(),
-      };
+    // Try to get user document from users collection
+    try {
+      const userDocuments = await databases.listDocuments(
+        config.databaseId!,
+        config.usersCollectionId!,
+        [Query.equal("email", authAccount.email)]
+      );
+
+      if (userDocuments.documents.length > 0) {
+        const userDoc = userDocuments.documents[0];
+        return {
+          $id: userDoc.$id,
+          userName: userDoc.userName,
+          email: userDoc.email,
+          password: userDoc.password,
+          phoneNumber: userDoc.phoneNumber,
+          location: userDoc.location,
+          preferences: userDoc.preferences ? (() => {
+            try {
+              return JSON.parse(userDoc.preferences);
+            } catch {
+              return undefined;
+            }
+          })() : undefined,
+          bio: userDoc.bio,
+          setupCompleted: userDoc.setupCompleted,
+        };
+      }
+    } catch (error) {
+      console.log("Error fetching user document:", error);
     }
 
-    return null;
+    // Fallback to auth account data if user document not found
+    return {
+      $id: authAccount.$id,
+      userName: authAccount.name,
+      email: authAccount.email,
+      password: "",
+      setupCompleted: false,
+    };
   } catch (error) {
     console.log(error);
     return null;
