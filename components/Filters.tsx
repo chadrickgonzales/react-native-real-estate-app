@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import { ScrollView, Text, TouchableOpacity } from "react-native";
 
 import { categories } from "@/constants/data";
@@ -7,13 +7,13 @@ import { categories } from "@/constants/data";
 const Filters = () => {
   const params = useLocalSearchParams<{ filter?: string }>();
   const [selectedCategory, setSelectedCategory] = useState(
-    params.filter || "All"
+    params.filter || "Trending"
   );
 
   const handleCategoryPress = (category: string) => {
     if (selectedCategory === category) {
-      setSelectedCategory("");
-      router.setParams({ filter: "" });
+      setSelectedCategory("Trending");
+      router.setParams({ filter: "Trending" });
       return;
     }
 
@@ -25,23 +25,24 @@ const Filters = () => {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      className="mt-3 mb-2"
+      contentContainerClassName=""
+      className="rounded-full"
     >
       {categories.map((item, index) => (
         <TouchableOpacity
           onPress={() => handleCategoryPress(item.category)}
           key={index}
-          className={`flex flex-col items-start mr-4 px-4 py-2 rounded-full ${
+          className={`px-6 py-3 rounded-full mr-3 ${
             selectedCategory === item.category
               ? "bg-primary-300"
-              : "bg-primary-100 border border-primary-200"
+              : "bg-gray-100"
           }`}
         >
           <Text
-            className={`text-sm ${
+            className={`text-sm font-rubik-medium ${
               selectedCategory === item.category
-                ? "text-white font-rubik-bold mt-0.5"
-                : "text-black-300 font-rubik"
+                ? "text-white"
+                : "text-black-300"
             }`}
           >
             {item.title}
