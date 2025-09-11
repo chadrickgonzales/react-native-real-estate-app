@@ -1,13 +1,14 @@
 import * as Linking from "expo-linking";
 import { openAuthSessionAsync } from "expo-web-browser";
 import {
-  Account,
-  Avatars,
-  Client,
-  Databases,
-  OAuthProvider,
-  Query,
-  Storage
+    Account,
+    Avatars,
+    Client,
+    Databases,
+    ID,
+    OAuthProvider,
+    Query,
+    Storage
 } from "react-native-appwrite";
 
 export const config = {
@@ -21,6 +22,7 @@ export const config = {
   agentsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AGENTS_COLLECTION_ID,
   propertiesCollectionId:
     process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID,
+  usersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID,
   bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID,
 };
 
@@ -77,6 +79,23 @@ export async function logout() {
   }
 }
 
+export async function signIn({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}) {
+  try {
+    const session = await account.createEmailPasswordSession(email, password);
+    if (!session) throw new Error("Session creation failed");
+    return session;
+  } catch (error) {
+    console.error("Sign in error:", error);
+    throw error;
+  }
+}
+
 export async function getCurrentUser() {
   try {
     const result = await account.get();
@@ -93,6 +112,72 @@ export async function getCurrentUser() {
   } catch (error) {
     console.log(error);
     return null;
+  }
+}
+
+export async function signUp({
+  email,
+  password,
+  name,
+}: {
+  email: string;
+  password: string;
+  name: string;
+}) {
+  try {
+    console.log("Starting signup process...");
+    console.log("Config:", {
+      databaseId: config.databaseId,
+      usersCollectionId: config.usersCollectionId,
+    });
+
+    // Create account in Appwrite Auth
+    console.log("Creating Appwrite Auth account...");
+    const newAccount = await account.create(
+      ID.unique(),
+      email,
+      password,
+      name
+    );
+
+    if (!newAccount) throw new Error("Account creation failed");
+    console.log("Auth account created successfully:", newAccount.$id);
+
+    // Create user document in the users collection
+    console.log("Creating user document in collection...");
+    const userDocument = await databases.createDocument(
+      config.databaseId!,
+      config.usersCollectionId!,
+      ID.unique(),
+      {
+        userName: name,
+        email: email,
+        password: password,
+      }
+    );
+
+    if (!userDocument) throw new Error("User document creation failed");
+    console.log("User document created successfully:", userDocument.$id);
+
+    // Sign in the user after successful registration
+    console.log("Creating session...");
+    const session = await account.createEmailPasswordSession(email, password);
+    if (!session) throw new Error("Session creation failed");
+    console.log("Session created successfully");
+
+    return {
+      account: newAccount,
+      user: userDocument,
+      session: session,
+    };
+  } catch (error: any) {
+    console.error("Detailed signup error:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+      response: error.response,
+    });
+    throw error;
   }
 }
 

@@ -1,5 +1,7 @@
+import { signIn } from '@/lib/appwrite'
+import { useGlobalContext } from '@/lib/global-provider'
 import { Ionicons } from '@expo/vector-icons'
-import { Link, router } from 'expo-router'
+import { Link, Redirect, router } from 'expo-router'
 import React, { useState } from 'react'
 import {
     Alert,
@@ -21,6 +23,10 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
+
+  const { refetch, loading, isLogged } = useGlobalContext()
+
+  if (!loading && isLogged) return <Redirect href="/(root)/(tabs)" />
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -47,13 +53,30 @@ export default function Login() {
     
     setIsLoading(true)
     try {
-      // TODO: Implement actual login logic here
-      console.log('Login data:', formData)
-      Alert.alert('Success', 'Login successful!', [
-        { text: 'OK', onPress: () => router.push('/(root)/(tabs)') }
-      ])
-    } catch {
-      Alert.alert('Error', 'Invalid email or password. Please try again.')
+      const result = await signIn({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (result) {
+        // Refetch user data to update global state
+        refetch()
+        Alert.alert('Success', 'Login successful!', [
+          { text: 'OK', onPress: () => router.push('/(root)/(tabs)') }
+        ])
+      }
+    } catch (error: any) {
+      console.error('Login error:', error)
+      let errorMessage = 'Invalid email or password. Please try again.'
+      
+      // Handle specific Appwrite errors
+      if (error.message?.includes('Invalid credentials')) {
+        errorMessage = 'Invalid email or password.'
+      } else if (error.message?.includes('User not found')) {
+        errorMessage = 'No account found with this email address.'
+      }
+      
+      Alert.alert('Error', errorMessage)
     } finally {
       setIsLoading(false)
     }

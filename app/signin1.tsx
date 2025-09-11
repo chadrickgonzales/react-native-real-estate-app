@@ -1,5 +1,5 @@
 import icons from "@/constants/icons"
-import { login } from "@/lib/appwrite"
+import { login, signUp } from "@/lib/appwrite"
 import { useGlobalContext } from "@/lib/global-provider"
 import { Ionicons } from '@expo/vector-icons'
 import { Link, Redirect, router } from 'expo-router'
@@ -61,13 +61,33 @@ export default function Signin1() {
     
     setIsLoading(true)
     try {
-      // TODO: Implement actual signup logic here
-      console.log('Signup data:', formData)
-      Alert.alert('Success', 'Account created successfully!', [
-        { text: 'OK', onPress: () => router.push('/login') }
-      ])
-    } catch {
-      Alert.alert('Error', 'Failed to create account. Please try again.')
+      const result = await signUp({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+      })
+
+      if (result) {
+        // Refetch user data to update global state
+        refetch()
+        Alert.alert('Success', 'Account created successfully!', [
+          { text: 'OK', onPress: () => router.push('/(root)/(tabs)') }
+        ])
+      }
+    } catch (error: any) {
+      console.error('Signup error:', error)
+      let errorMessage = 'Failed to create account. Please try again.'
+      
+      // Handle specific Appwrite errors
+      if (error.message?.includes('email')) {
+        errorMessage = 'An account with this email already exists.'
+      } else if (error.message?.includes('password')) {
+        errorMessage = 'Password does not meet requirements.'
+      } else if (error.message?.includes('name')) {
+        errorMessage = 'Please enter a valid name.'
+      }
+      
+      Alert.alert('Error', errorMessage)
     } finally {
       setIsLoading(false)
     }
