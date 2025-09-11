@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import {
   ActivityIndicator,
@@ -57,6 +57,7 @@ const Home = () => {
 
   return (
     <SafeAreaView className="h-full bg-white">
+
       <FlatList
         data={properties}
         numColumns={2}
@@ -96,7 +97,7 @@ const Home = () => {
             </View>
 
             <Search />
-
+      <Link href="/signin"></Link>
             <View className="my-5">
               <View className="flex flex-row items-center justify-between">
                 <Text className="text-xl font-rubik-bold text-black-300">
