@@ -89,7 +89,6 @@ const Profile = () => {
         contentContainerClassName="pb-32 px-7"
       >
         <View className="flex flex-row items-center justify-between mt-5">
-          <Image source={icons.bell} className="size-5" />
         </View>
 
         {/* Profile Header */}
@@ -103,7 +102,7 @@ const Profile = () => {
             </View>
             <TouchableOpacity 
               className="absolute -bottom-1 -right-1 bg-primary-300 rounded-full p-3 shadow-lg"
-              onPress={() => router.push('/edit-profile')}
+              onPress={() => router.push('/profilePages/edit-profile')}
             >
               <Ionicons name="camera" size={16} color="white" />
             </TouchableOpacity>
@@ -129,7 +128,7 @@ const Profile = () => {
             <Text className="text-xl font-rubik-bold text-black-300">Profile Information</Text>
             <TouchableOpacity 
               className="bg-primary-100 px-3 py-1 rounded-full"
-              onPress={() => router.push('/edit-profile')}
+              onPress={() => router.push('/profilePages/edit-profile')}
             >
               <Text className="text-sm font-rubik-medium text-primary-300">Edit</Text>
             </TouchableOpacity>
@@ -150,7 +149,7 @@ const Profile = () => {
               {!user?.phoneNumber && (
                 <TouchableOpacity 
                   className="bg-primary-300 px-3 py-1 rounded-full"
-                  onPress={() => router.push('/edit-profile')}
+                  onPress={() => router.push('/profilePages/edit-profile')}
                 >
                   <Text className="text-xs font-rubik-bold text-white">Add</Text>
                 </TouchableOpacity>
@@ -171,7 +170,7 @@ const Profile = () => {
               {!user?.location && (
                 <TouchableOpacity 
                   className="bg-primary-300 px-3 py-1 rounded-full"
-                  onPress={() => router.push('/edit-profile')}
+                  onPress={() => router.push('/profilePages/edit-profile')}
                 >
                   <Text className="text-xs font-rubik-bold text-white">Add</Text>
                 </TouchableOpacity>
@@ -229,12 +228,12 @@ const Profile = () => {
             <SettingsItem 
               icon={icons.calendar} 
               title="My Bookings" 
-              onPress={() => router.push('/my-bookings')}
+              onPress={() => router.push('/profilePages/my-bookings')}
             />
             <SettingsItem 
               icon={icons.wallet} 
               title="Payments" 
-              onPress={() => router.push('/payments')}
+              onPress={() => router.push('/profilePages/payments')}
             />
           </View>
         </View>
@@ -246,22 +245,22 @@ const Profile = () => {
             <SettingsItem 
               icon={icons.person} 
               title="Edit Profile" 
-              onPress={() => router.push('/edit-profile')}
+              onPress={() => router.push('/profilePages/edit-profile')}
             />
             <SettingsItem 
               icon={icons.heart} 
               title="Favorites" 
-              onPress={() => router.push('/favorites')}
+              onPress={() => router.push('/profilePages/favorites')}
             />
             <SettingsItem 
               icon={icons.bell} 
               title="Notifications" 
-              onPress={() => router.push('/notifications-settings')}
+              onPress={() => router.push('/profilePages/notifications-settings')}
             />
             <SettingsItem 
               icon={icons.shield} 
               title="Security" 
-              onPress={() => router.push('/security-settings')}
+              onPress={() => router.push('/profilePages/security-settings')}
             />
             <SettingsItem 
               icon={icons.language} 
@@ -271,12 +270,12 @@ const Profile = () => {
             <SettingsItem 
               icon={icons.info} 
               title="Help Center" 
-              onPress={() => router.push('/help-support')}
+              onPress={() => router.push('/profilePages/help-support')}
             />
             <SettingsItem 
               icon={icons.info} 
               title="About" 
-              onPress={() => router.push('/about')}
+              onPress={() => router.push('/profilePages/about')}
             />
             <SettingsItem 
               icon={icons.people} 

@@ -50,7 +50,7 @@ export default function About() {
   const { user } = useGlobalContext()
 
   const handlePrivacyPolicy = () => {
-    router.push('/privacy-policy')
+    router.push('/profilePages/privacy-policy')
   }
 
   const handleTermsOfService = () => {
