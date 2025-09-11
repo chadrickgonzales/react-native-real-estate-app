@@ -17,6 +17,7 @@ interface User {
   password: string;
   phoneNumber?: string;
   location?: string;
+  avatar?: string;
   preferences?: {
     propertyType?: string;
     budget?: string;
@@ -24,6 +25,8 @@ interface User {
   };
   bio?: string;
   setupCompleted?: boolean;
+  $createdAt?: string;
+  createdAt?: string;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);

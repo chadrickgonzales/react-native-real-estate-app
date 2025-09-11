@@ -168,6 +168,7 @@ export async function getCurrentUser() {
           })() : undefined,
           bio: userDoc.bio,
           setupCompleted: userDoc.setupCompleted,
+          createdAt: userDoc.createdAt,
         };
       }
     } catch (error) {
@@ -185,6 +186,7 @@ export async function getCurrentUser() {
       preferences: undefined,
       bio: undefined,
       setupCompleted: false,
+      createdAt: authAccount.$createdAt,
     };
   } catch (error) {
     console.log(error);
@@ -224,6 +226,7 @@ export async function createGoogleOAuthUser({
         email: email,
         password: "", // No password for OAuth users
         setupCompleted: false, // Will be completed during account setup
+        createdAt: new Date().toISOString(),
       }
     );
 
@@ -279,6 +282,7 @@ export async function signUp({
         userName: name,
         email: email,
         password: password,
+        createdAt: new Date().toISOString(),
       }
     );
 
