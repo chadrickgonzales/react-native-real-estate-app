@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 export default function AccountSetup() {
   const [formData, setFormData] = useState({
+    userName: '',
     phoneNumber: '',
     location: '',
     preferences: {
@@ -30,7 +31,9 @@ export default function AccountSetup() {
   const [currentStep, setCurrentStep] = useState(1)
   const { user, refetch } = useGlobalContext()
 
-  const totalSteps = 3
+  // Check if user needs to set username (Google OAuth users)
+  const needsUsername = user && !user.userName && user.email
+  const totalSteps = needsUsername ? 4 : 3
 
   const handleInputChange = (field: string, value: string) => {
     if (field.includes('.')) {
@@ -48,8 +51,20 @@ export default function AccountSetup() {
   }
 
   const validateStep = (step: number) => {
-    switch (step) {
-      case 1:
+    const adjustedStep = needsUsername ? step : step + 1
+    
+    switch (adjustedStep) {
+      case 1: // Username step (only for Google OAuth users)
+        if (!formData.userName.trim()) {
+          Alert.alert('Error', 'Please enter a username')
+          return false
+        }
+        if (formData.userName.length < 3) {
+          Alert.alert('Error', 'Username must be at least 3 characters long')
+          return false
+        }
+        return true
+      case 2: // Contact information
         if (!formData.phoneNumber.trim()) {
           Alert.alert('Error', 'Please enter your phone number')
           return false
@@ -59,7 +74,7 @@ export default function AccountSetup() {
           return false
         }
         return true
-      case 2:
+      case 3: // Property preferences
         if (!formData.preferences.propertyType) {
           Alert.alert('Error', 'Please select a property type')
           return false
@@ -69,8 +84,8 @@ export default function AccountSetup() {
           return false
         }
         return true
-      case 3:
-        return true // Bio is optional
+      case 4: // Bio (optional)
+        return true
       default:
         return true
     }
@@ -95,15 +110,22 @@ export default function AccountSetup() {
   const handleCompleteSetup = async () => {
     setIsLoading(true)
     try {
+      const profileData: any = {
+        phoneNumber: formData.phoneNumber,
+        location: formData.location,
+        preferences: JSON.stringify(formData.preferences),
+        bio: formData.bio,
+        setupCompleted: true,
+      }
+
+      // Include username if it was collected (for Google OAuth users)
+      if (needsUsername && formData.userName) {
+        profileData.userName = formData.userName
+      }
+
       const result = await updateUserProfile({
         userId: user?.$id || '',
-        profileData: {
-          phoneNumber: formData.phoneNumber,
-          location: formData.location,
-          preferences: JSON.stringify(formData.preferences),
-          bio: formData.bio,
-          setupCompleted: true,
-        }
+        profileData
       })
 
       if (result) {
@@ -119,6 +141,31 @@ export default function AccountSetup() {
       setIsLoading(false)
     }
   }
+
+  const renderUsernameStep = () => (
+    <View className="space-y-6">
+      <View>
+        <Text className="text-sm font-rubik-medium text-black-300 mb-2">
+          Choose a Username
+        </Text>
+        <View className="flex-row items-center bg-accent-100 rounded-xl px-4 py-4 border border-gray-200">
+          <Ionicons name="person-outline" size={20} color="#666876" />
+          <TextInput
+            className="flex-1 ml-3 text-base font-rubik text-black-300"
+            placeholder="Enter your username"
+            placeholderTextColor="#8c8e98"
+            value={formData.userName}
+            onChangeText={(value) => handleInputChange('userName', value)}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+        <Text className="text-xs font-rubik text-black-200 mt-2">
+          This will be displayed as your name in the app
+        </Text>
+      </View>
+    </View>
+  )
 
   const renderStep1 = () => (
     <View className="space-y-6">
@@ -257,28 +304,58 @@ export default function AccountSetup() {
   )
 
   const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 1:
-        return renderStep1()
-      case 2:
-        return renderStep2()
-      case 3:
-        return renderStep3()
-      default:
-        return renderStep1()
+    if (needsUsername) {
+      switch (currentStep) {
+        case 1:
+          return renderUsernameStep()
+        case 2:
+          return renderStep1()
+        case 3:
+          return renderStep2()
+        case 4:
+          return renderStep3()
+        default:
+          return renderUsernameStep()
+      }
+    } else {
+      switch (currentStep) {
+        case 1:
+          return renderStep1()
+        case 2:
+          return renderStep2()
+        case 3:
+          return renderStep3()
+        default:
+          return renderStep1()
+      }
     }
   }
 
   const getStepTitle = () => {
-    switch (currentStep) {
-      case 1:
-        return 'Contact Information'
-      case 2:
-        return 'Property Preferences'
-      case 3:
-        return 'About You'
-      default:
-        return 'Setup'
+    if (needsUsername) {
+      switch (currentStep) {
+        case 1:
+          return 'Choose Username'
+        case 2:
+          return 'Contact Information'
+        case 3:
+          return 'Property Preferences'
+        case 4:
+          return 'About You'
+        default:
+          return 'Setup'
+      }
+    } else {
+      switch (currentStep) {
+        case 1:
+          return 'Contact Information'
+        case 2:
+          return 'Property Preferences'
+        case 3:
+          return 'About You'
+        default:
+          return 'Setup'
+      }
     }
   }
 

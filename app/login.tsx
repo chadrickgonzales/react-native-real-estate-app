@@ -1,4 +1,4 @@
-import { signIn } from '@/lib/appwrite'
+import { login, signIn } from '@/lib/appwrite'
 import { useGlobalContext } from '@/lib/global-provider'
 import { Ionicons } from '@expo/vector-icons'
 import { Link, Redirect, router } from 'expo-router'
@@ -88,6 +88,28 @@ export default function Login() {
       'Password reset functionality will be implemented here.',
       [{ text: 'OK' }]
     )
+  }
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true)
+    try {
+      const result = await login()
+      
+      if (result) {
+        // Refetch user data to update global state
+        refetch()
+        Alert.alert('Success', 'Login successful!', [
+          { text: 'OK', onPress: () => router.push('/(root)/(tabs)') }
+        ])
+      } else {
+        Alert.alert('Error', 'Google login failed. Please try again.')
+      }
+    } catch (error: any) {
+      console.error('Google login error:', error)
+      Alert.alert('Error', 'Google login failed. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -207,7 +229,11 @@ export default function Login() {
 
           {/* Social Login Buttons */}
           <View className="space-y-3">
-            <TouchableOpacity className="flex-row items-center justify-center py-4 rounded-xl border border-gray-200 bg-white">
+            <TouchableOpacity 
+              className="flex-row items-center justify-center py-4 rounded-xl border border-gray-200 bg-white"
+              onPress={handleGoogleLogin}
+              disabled={isLoading}
+            >
               <Ionicons name="logo-google" size={20} color="#DB4437" />
               <Text className="ml-3 text-base font-rubik-medium text-black-300">
                 Continue with Google

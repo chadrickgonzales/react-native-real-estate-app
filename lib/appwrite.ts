@@ -62,6 +62,20 @@ export async function login() {
     const session = await account.createSession(userId, secret);
     if (!session) throw new Error("Failed to create session");
 
+    // After successful OAuth login, create user document if it doesn't exist
+    try {
+      const authAccount = await account.get();
+      if (authAccount.email && authAccount.name) {
+        await createGoogleOAuthUser({
+          email: authAccount.email,
+          name: authAccount.name,
+        });
+      }
+    } catch (userCreationError) {
+      console.log("User document creation failed, but login was successful:", userCreationError);
+      // Don't fail the login if user document creation fails
+    }
+
     return true;
   } catch (error) {
     console.error(error);
@@ -166,11 +180,64 @@ export async function getCurrentUser() {
       userName: authAccount.name,
       email: authAccount.email,
       password: "",
+      phoneNumber: undefined,
+      location: undefined,
+      preferences: undefined,
+      bio: undefined,
       setupCompleted: false,
     };
   } catch (error) {
     console.log(error);
     return null;
+  }
+}
+
+export async function createGoogleOAuthUser({
+  email,
+  name,
+}: {
+  email: string;
+  name: string;
+}) {
+  try {
+    console.log("Creating Google OAuth user document...");
+    
+    // Check if user document already exists
+    const existingUsers = await databases.listDocuments(
+      config.databaseId!,
+      config.usersCollectionId!,
+      [Query.equal("email", email)]
+    );
+
+    if (existingUsers.documents.length > 0) {
+      console.log("User document already exists");
+      return existingUsers.documents[0];
+    }
+
+    // Create user document for Google OAuth user
+    const userDocument = await databases.createDocument(
+      config.databaseId!,
+      config.usersCollectionId!,
+      ID.unique(),
+      {
+        userName: name,
+        email: email,
+        password: "", // No password for OAuth users
+        setupCompleted: false, // Will be completed during account setup
+      }
+    );
+
+    if (!userDocument) throw new Error("User document creation failed");
+    console.log("Google OAuth user document created successfully:", userDocument.$id);
+
+    return userDocument;
+  } catch (error: any) {
+    console.error("Google OAuth user creation error:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+    });
+    throw error;
   }
 }
 
