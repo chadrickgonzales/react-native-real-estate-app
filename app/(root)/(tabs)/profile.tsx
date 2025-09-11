@@ -14,7 +14,6 @@ import {
 import { logout } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 
-import { settings } from "@/constants/data";
 import icons from "@/constants/icons";
 import images from "@/constants/images";
 
@@ -90,7 +89,6 @@ const Profile = () => {
         contentContainerClassName="pb-32 px-7"
       >
         <View className="flex flex-row items-center justify-between mt-5">
-          <Text className="text-xl font-rubik-bold">Profile</Text>
           <Image source={icons.bell} className="size-5" />
         </View>
 
@@ -228,8 +226,16 @@ const Profile = () => {
         <View className="mt-8 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <Text className="text-xl font-rubik-bold text-black-300 mb-4">Quick Actions</Text>
           <View className="space-y-3">
-            <SettingsItem icon={icons.calendar} title="My Bookings" />
-            <SettingsItem icon={icons.wallet} title="Payments" />
+            <SettingsItem 
+              icon={icons.calendar} 
+              title="My Bookings" 
+              onPress={() => router.push('/my-bookings')}
+            />
+            <SettingsItem 
+              icon={icons.wallet} 
+              title="Payments" 
+              onPress={() => router.push('/payments')}
+            />
           </View>
         </View>
 
@@ -242,9 +248,41 @@ const Profile = () => {
               title="Edit Profile" 
               onPress={() => router.push('/edit-profile')}
             />
-            {settings.slice(3).map((item, index) => (
-              <SettingsItem key={index} {...item} />
-            ))}
+            <SettingsItem 
+              icon={icons.heart} 
+              title="Favorites" 
+              onPress={() => router.push('/favorites')}
+            />
+            <SettingsItem 
+              icon={icons.bell} 
+              title="Notifications" 
+              onPress={() => router.push('/notifications-settings')}
+            />
+            <SettingsItem 
+              icon={icons.shield} 
+              title="Security" 
+              onPress={() => router.push('/security-settings')}
+            />
+            <SettingsItem 
+              icon={icons.language} 
+              title="Language" 
+              onPress={() => Alert.alert('Language', 'Language settings will be implemented here.')}
+            />
+            <SettingsItem 
+              icon={icons.info} 
+              title="Help Center" 
+              onPress={() => router.push('/help-support')}
+            />
+            <SettingsItem 
+              icon={icons.info} 
+              title="About" 
+              onPress={() => router.push('/about')}
+            />
+            <SettingsItem 
+              icon={icons.people} 
+              title="Invite Friends" 
+              onPress={() => Alert.alert('Invite Friends', 'Invite friends functionality will be implemented here.')}
+            />
           </View>
         </View>
 

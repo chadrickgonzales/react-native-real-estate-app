@@ -71,34 +71,47 @@ export const settings = [
   {
     title: "My Bookings",
     icon: icons.calendar,
+    onPress: () => {}, // Will be set in component
   },
   {
     title: "Payments",
     icon: icons.wallet,
+    onPress: () => {}, // Will be set in component
   },
   {
-    title: "Profile",
-    icon: icons.person,
+    title: "Favorites",
+    icon: icons.heart,
+    onPress: () => {}, // Will be set in component
   },
   {
     title: "Notifications",
     icon: icons.bell,
+    onPress: () => {}, // Will be set in component
   },
   {
     title: "Security",
     icon: icons.shield,
+    onPress: () => {}, // Will be set in component
   },
   {
     title: "Language",
     icon: icons.language,
+    onPress: () => {}, // Will be set in component
   },
   {
     title: "Help Center",
     icon: icons.info,
+    onPress: () => {}, // Will be set in component
+  },
+  {
+    title: "About",
+    icon: icons.info,
+    onPress: () => {}, // Will be set in component
   },
   {
     title: "Invite Friends",
     icon: icons.people,
+    onPress: () => {}, // Will be set in component
   },
 ];
 
