@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  SafeAreaView,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    SafeAreaView,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import { Card } from "@/components/Cards";

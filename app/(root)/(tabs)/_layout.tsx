@@ -1,6 +1,9 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { Image, ImageSourcePropType, Text, View } from "react-native";
+import { useState } from "react";
+import { Image, ImageSourcePropType, Text, TouchableOpacity, View } from "react-native";
 
+import AddPropertyBottomSheet from "@/components/AddPropertyBottomSheet";
 import SetupGuard from "@/components/SetupGuard";
 import icons from "@/constants/icons";
 
@@ -8,18 +11,30 @@ const TabIcon = ({
   focused,
   icon,
   title,
+  isIonicon = false,
+  ioniconName,
 }: {
   focused: boolean;
-  icon: ImageSourcePropType;
+  icon?: ImageSourcePropType;
   title: string;
+  isIonicon?: boolean;
+  ioniconName?: keyof typeof Ionicons.glyphMap;
 }) => (
   <View className="flex-1 mt-3 flex flex-col items-center">
-    <Image
-      source={icon}
-      tintColor={focused ? "#0061FF" : "#666876"}
-      resizeMode="contain"
-      className="size-6"
-    />
+    {isIonicon ? (
+      <Ionicons
+        name={ioniconName || "add"}
+        size={24}
+        color={focused ? "#0061FF" : "#666876"}
+      />
+    ) : (
+      <Image
+        source={icon!}
+        tintColor={focused ? "#0061FF" : "#666876"}
+        resizeMode="contain"
+        className="size-6"
+      />
+    )}
     <Text
       className={`${
         focused
@@ -33,6 +48,14 @@ const TabIcon = ({
 );
 
 const TabsLayout = () => {
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
+
+  const handleAddProperty = (propertyData: any) => {
+    // Handle property submission here
+    console.log("New property:", propertyData);
+    // You can add logic to save to database, show success message, etc.
+  };
+
   return (
     <SetupGuard>
       <Tabs
@@ -70,10 +93,21 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Chat",
+          title: "Add",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={icons.chat} title="Chat" />
+            <TabIcon 
+              focused={focused} 
+              isIonicon={true}
+              ioniconName="add"
+              title="Add" 
+            />
+          ),
+          tabBarButton: (props) => (
+            <TouchableOpacity
+              {...props}
+              onPress={() => setShowBottomSheet(true)}
+            />
           ),
         }}
       />
@@ -98,6 +132,12 @@ const TabsLayout = () => {
         }}
       />
       </Tabs>
+      
+      <AddPropertyBottomSheet
+        visible={showBottomSheet}
+        onClose={() => setShowBottomSheet(false)}
+        onSubmit={handleAddProperty}
+      />
     </SetupGuard>
   );
 };

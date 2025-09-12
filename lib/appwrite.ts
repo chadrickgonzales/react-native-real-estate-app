@@ -458,3 +458,75 @@ export async function getPropertyById({ id }: { id: string }) {
     return null;
   }
 }
+
+export async function createProperty(propertyData: any) {
+  try {
+    console.log("Creating property with data:", propertyData);
+    
+    // Check if user is authenticated
+    const currentUser = await account.get();
+    console.log("Current authenticated user:", currentUser);
+    
+    if (!currentUser) {
+      throw new Error("User not authenticated");
+    }
+    
+    const result = await databases.createDocument(
+      config.databaseId!,
+      config.propertiesCollectionId!,
+      ID.unique(),
+      {
+        // Only include fields that exist in the current schema
+        name: propertyData.title || "Untitled Property",
+        type: propertyData.type || "House",
+        description: propertyData.description || "",
+        address: propertyData.address || "",
+        price: parseFloat(propertyData.price) || 0,
+        area: parseFloat(propertyData.area) || 0,
+        bedrooms: parseInt(propertyData.bedrooms) || 0,
+        bathrooms: parseInt(propertyData.bathrooms) || 0,
+        rating: 0, // Default rating for new properties
+        
+        // Required fields that were added to the schema
+        propertyAge: propertyData.propertyAge || "",
+        contactPhone: propertyData.contactPhone || "",
+        contactEmail: propertyData.contactEmail || "",
+        propertyType: propertyData.propertyType || "",
+        availableDate: propertyData.availableDate || "",
+        furnishedStatus: propertyData.furnishedStatus || false,
+        petFriendly: propertyData.petFriendly || false,
+        hasHOA: propertyData.hasHOA || false,
+        hasPool: propertyData.hasPool || false,
+        hasGarage: propertyData.hasGarage || false,
+        utilitiesIncluded: propertyData.utilitiesIncluded || false,
+        smokingAllowed: propertyData.smokingAllowed || false,
+        backgroundCheckRequired: propertyData.backgroundCheckRequired || false,
+        parkingSpaces: propertyData.parkingSpaces || "",
+        yearBuilt: propertyData.yearBuilt || "",
+        lotSize: propertyData.lotSize || "",
+        propertyCondition: propertyData.propertyCondition || "",
+        hoaFees: propertyData.hoaFees || "",
+        propertyTaxes: propertyData.propertyTaxes || "",
+        leaseDuration: propertyData.leaseDuration || "",
+        deposit: propertyData.deposit || "",
+        utilities: propertyData.utilities || "",
+        moveInRequirements: propertyData.moveInRequirements || "",
+        petDeposit: propertyData.petDeposit || "",
+        utilitiesResponsibility: propertyData.utilitiesResponsibility || "",
+        furnitureIncluded: propertyData.furnitureIncluded || "",
+        utilitiesIncludedText: propertyData.utilitiesIncludedText || "",
+        amenities: propertyData.amenities || "",
+      }
+    );
+
+    console.log("Property created successfully:", result.$id);
+    return result;
+  } catch (error: any) {
+    console.error("Error creating property:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+    });
+    throw error;
+  }
+}
