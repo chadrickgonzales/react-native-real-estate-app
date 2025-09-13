@@ -1,8 +1,9 @@
 import images from '@/constants/images'
 import { useGlobalContext } from '@/lib/global-provider'
+import { createImageSource } from '@/lib/imageUtils'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
     Alert,
     FlatList,
@@ -120,7 +121,7 @@ const FavoriteCard = ({ property }: { property: FavoriteProperty }) => {
       {/* Property Image and Actions */}
       <View className="relative mb-6">
         <Image
-          source={{ uri: property.propertyImage }}
+          source={createImageSource(property.propertyImage)}
           className="w-full h-48 rounded-xl"
           resizeMode="cover"
         />

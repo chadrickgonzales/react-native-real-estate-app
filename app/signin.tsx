@@ -1,9 +1,8 @@
-import React from "react";
 import {
-  Image,
-  ScrollView,
-  Text,
-  View
+    Image,
+    ScrollView,
+    Text,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 

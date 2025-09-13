@@ -13,6 +13,7 @@ import {
 import images from "@/constants/images";
 
 import { getPropertyById } from "@/lib/appwrite";
+import { createImageSource } from "@/lib/imageUtils";
 import { useAppwrite } from "@/lib/useAppwrite";
 
 const Property = () => {
@@ -68,7 +69,7 @@ const Property = () => {
         <Image
           source={
             !imageError && property?.image 
-              ? { uri: property.image } 
+              ? createImageSource(property.image) 
               : images.newYork
           }
           className="w-full h-full"
@@ -162,7 +163,7 @@ const Property = () => {
                  <Image
                    source={
                      !thumbnailError && property?.image 
-                       ? { uri: property.image } 
+                       ? createImageSource(property.image) 
                        : images.newYork
                    }
                    className="w-12 h-12 rounded-lg mr-3"

@@ -125,7 +125,7 @@ export default function EditProfile() {
           <View className="flex items-center mt-8 mb-8">
             <View className="relative">
               <Image
-                source={user?.avatar ? { uri: user.avatar } : images.avatar}
+                source={user?.avatar ? createImageSource(user.avatar) : images.avatar}
                 className="size-32 rounded-full"
               />
               <TouchableOpacity className="absolute bottom-0 right-0 bg-primary-300 rounded-full p-2">

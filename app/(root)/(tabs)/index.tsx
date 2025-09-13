@@ -2,13 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Image,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -17,6 +17,7 @@ import images from "@/constants/images";
 
 import { getLatestProperties, getProperties } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
+import { createImageSource } from "@/lib/imageUtils";
 import { useAppwrite } from "@/lib/useAppwrite";
 
 const Home = () => {
@@ -64,7 +65,7 @@ const Home = () => {
           <View className="flex-row items-center justify-between mb-6">
             <View className="flex-row items-center">
               <Image
-                source={user?.avatar ? { uri: user.avatar } : images.avatar}
+                source={user?.avatar ? createImageSource(user.avatar) : images.avatar}
                 className="w-12 h-12 rounded-full"
               />
             </View>
@@ -148,7 +149,7 @@ const Home = () => {
                 >
                   <View className="relative mb-4">
                     <Image
-                      source={{ uri: property.image || images.newYork }}
+                      source={createImageSource(property.image, images.newYork)}
                       className="w-full h-48 rounded-2xl"
                       resizeMode="cover"
                     />
@@ -207,7 +208,7 @@ const Home = () => {
                   onPress={() => handleCardPress(property.$id)}
                 >
                   <Image
-                    source={{ uri: property.image || images.newYork }}
+                    source={createImageSource(property.image, images.newYork)}
                     className="w-16 h-16 rounded-xl mr-4"
                     resizeMode="cover"
                   />

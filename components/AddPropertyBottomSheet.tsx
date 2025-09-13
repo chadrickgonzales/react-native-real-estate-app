@@ -1,17 +1,18 @@
 import { categories } from "@/constants/data";
 import images from "@/constants/images";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from "react";
 import {
-    Alert,
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { createProperty } from "../lib/appwrite";
 import { useGlobalContext } from "../lib/global-provider";
@@ -146,6 +147,7 @@ const AddPropertyBottomSheet = ({
   });
 
   const [errors, setErrors] = useState<Partial<PropertyData>>({});
+  const [isPickingImage, setIsPickingImage] = useState(false);
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -338,13 +340,78 @@ const AddPropertyBottomSheet = ({
     }).format(Number(price));
   };
 
+  const requestPermissions = async () => {
+    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+    const { status: mediaLibraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (cameraStatus !== 'granted' || mediaLibraryStatus !== 'granted') {
+      Alert.alert(
+        'Permissions Required',
+        'Camera and photo library permissions are required to add images.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const showImagePickerOptions = () => {
+    Alert.alert(
+      'Add Property Image',
+      'Choose how you want to add an image to your property listing',
+      [
+        { text: '📷 Take Photo', onPress: () => pickImage('camera') },
+        { text: '🖼️ Choose from Gallery', onPress: () => pickImage('library') },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const pickImage = async (source: 'camera' | 'library') => {
+    const hasPermissions = await requestPermissions();
+    if (!hasPermissions) return;
+
+    setIsPickingImage(true);
+    try {
+      let result;
+      
+      if (source === 'camera') {
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+      }
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        setPropertyData({
+          ...propertyData,
+          images: [...propertyData.images, imageUri]
+        });
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    } finally {
+      setIsPickingImage(false);
+    }
+  };
+
   const addImage = () => {
-    // For demo purposes, we'll add a placeholder image
-    // In a real app, you'd use image picker
-    setPropertyData({
-      ...propertyData,
-      images: [...propertyData.images, "placeholder"]
-    });
+    if (propertyData.images.length >= 5) {
+      Alert.alert('Limit Reached', 'You can only add up to 5 images.');
+      return;
+    }
+    showImagePickerOptions();
   };
 
   const removeImage = (index: number) => {
@@ -949,10 +1016,10 @@ const AddPropertyBottomSheet = ({
             Property Images
           </Text>
           <View className="flex-row flex-wrap gap-2">
-            {propertyData.images.map((_, index) => (
+            {propertyData.images.map((imageUri, index) => (
               <View key={index} className="relative">
                 <Image
-                  source={images.newYork}
+                  source={{ uri: imageUri }}
                   className="w-20 h-20 rounded-lg"
                   resizeMode="cover"
                 />
@@ -967,9 +1034,18 @@ const AddPropertyBottomSheet = ({
             {propertyData.images.length < 5 && (
               <TouchableOpacity
                 onPress={addImage}
-                className="w-20 h-20 bg-gray-200 rounded-lg items-center justify-center border-2 border-dashed border-gray-400"
+                disabled={isPickingImage}
+                className={`w-20 h-20 rounded-lg items-center justify-center border-2 border-dashed ${
+                  isPickingImage 
+                    ? 'bg-blue-100 border-blue-300' 
+                    : 'bg-gray-200 border-gray-400'
+                }`}
               >
-                <Ionicons name="add" size={24} color="#666" />
+                {isPickingImage ? (
+                  <Ionicons name="hourglass" size={24} color="#3B82F6" />
+                ) : (
+                  <Ionicons name="camera" size={24} color="#666" />
+                )}
               </TouchableOpacity>
             )}
           </View>
@@ -1184,7 +1260,7 @@ const AddPropertyBottomSheet = ({
       {/* Hero Image Section */}
       <View className="relative" style={{ height: windowHeight * 0.4 }}>
         <Image
-          source={propertyData.images.length > 0 ? images.newYork : images.newYork}
+          source={propertyData.images.length > 0 ? { uri: propertyData.images[0] } : images.newYork}
           className="w-full h-full"
           resizeMode="cover"
         />

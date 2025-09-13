@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import images from "@/constants/images";
+import { createImageSource } from "@/lib/imageUtils";
 
 const Saved = () => {
   const [activeTab, setActiveTab] = useState("Updates");
@@ -152,7 +153,7 @@ const Saved = () => {
                   <View className="rounded-2xl overflow-hidden">
                     <View className="relative">
                       <Image
-                        source={{ uri: property.image }}
+                        source={createImageSource(property.image)}
                         className="w-full h-48"
                         resizeMode="cover"
                       />
@@ -215,7 +216,7 @@ const Saved = () => {
                   <View className="rounded-2xl overflow-hidden">
                     <View className="relative">
                       <Image
-                        source={{ uri: property.image }}
+                        source={createImageSource(property.image)}
                         className="w-full h-48"
                         resizeMode="cover"
                       />

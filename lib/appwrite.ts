@@ -1,14 +1,14 @@
 import * as Linking from "expo-linking";
 import { openAuthSessionAsync } from "expo-web-browser";
 import {
-    Account,
-    Avatars,
-    Client,
-    Databases,
-    ID,
-    OAuthProvider,
-    Query,
-    Storage
+  Account,
+  Avatars,
+  Client,
+  Databases,
+  ID,
+  OAuthProvider,
+  Query,
+  Storage
 } from "react-native-appwrite";
 
 export const config = {

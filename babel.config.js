@@ -6,6 +6,7 @@ module.exports = function (api) {
       "nativewind/babel",
     ],
     plugins: [
+      // Use the new worklets plugin instead of the deprecated reanimated plugin
       "react-native-worklets/plugin",
     ],
   };

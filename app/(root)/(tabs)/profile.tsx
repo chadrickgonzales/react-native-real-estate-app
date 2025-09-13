@@ -96,7 +96,7 @@ const Profile = () => {
           <View className="relative">
             <View className="size-32 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 p-1 shadow-lg">
               <Image
-                source={user?.avatar ? { uri: user.avatar } : images.avatar}
+                source={user?.avatar ? createImageSource(user.avatar) : images.avatar}
                 className="size-full rounded-full"
               />
             </View>

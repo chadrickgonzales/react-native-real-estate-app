@@ -1,5 +1,4 @@
 import images from '@/constants/images'
-import React from 'react'
 import { Image, Text, View } from 'react-native'
 
 const NoResults = () => {

@@ -1,8 +1,9 @@
 import images from '@/constants/images'
 import { useGlobalContext } from '@/lib/global-provider'
+import { createImageSource } from '@/lib/imageUtils'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
     Alert,
     FlatList,
@@ -136,7 +137,7 @@ const BookingCard = ({ booking }: { booking: Booking }) => {
       {/* Property Image and Status */}
       <View className="relative mb-6">
         <Image
-          source={{ uri: booking.propertyImage }}
+          source={createImageSource(booking.propertyImage)}
           className="w-full h-48 rounded-xl"
           resizeMode="cover"
         />
