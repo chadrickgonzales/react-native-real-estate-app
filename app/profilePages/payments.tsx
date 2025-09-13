@@ -2,10 +2,11 @@ import images from '@/constants/images'
 import { useGlobalContext } from '@/lib/global-provider'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
     Alert,
     FlatList,
+    Image,
     RefreshControl,
     ScrollView,
     Text,
@@ -409,7 +410,7 @@ export default function Payments() {
                 />
                 <Text className="text-xl font-rubik-bold text-black-300 mb-2">No Payment History</Text>
                 <Text className="text-base font-rubik text-black-200 text-center">
-                  You haven't made any payments yet.
+                  You haven&apos;t made any payments yet.
                 </Text>
               </View>
             )}

@@ -4,15 +4,15 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from "react";
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    Image,
+    Modal,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { createProperty } from "../lib/appwrite";
 import { useGlobalContext } from "../lib/global-provider";
@@ -148,6 +148,7 @@ const AddPropertyBottomSheet = ({
 
   const [errors, setErrors] = useState<Partial<PropertyData>>({});
   const [isPickingImage, setIsPickingImage] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -239,7 +240,7 @@ const AddPropertyBottomSheet = ({
 
   const handleSubmit = async () => {
     try {
-      // Show loading state (you might want to add a loading indicator)
+      setIsUploading(true);
       console.log("Submitting property data:", propertyData);
       console.log("Current user:", user);
       
@@ -253,7 +254,7 @@ const AddPropertyBottomSheet = ({
         return;
       }
       
-      // Save to database
+      // Save to database (this will also handle image uploads)
       const result = await createProperty(propertyData);
       
       if (result) {
@@ -327,6 +328,8 @@ const AddPropertyBottomSheet = ({
         "Failed to list your property. Please try again.",
         [{ text: "OK" }]
       );
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -1419,11 +1422,14 @@ const AddPropertyBottomSheet = ({
             <View className="flex-row items-center space-x-3">
               {currentStep === 4 && (
                 <TouchableOpacity
-                  className="bg-blue-600 px-4 py-2 rounded-lg"
+                  className={`px-4 py-2 rounded-lg ${
+                    isUploading ? 'bg-blue-400' : 'bg-blue-600'
+                  }`}
                   onPress={handleSubmit}
+                  disabled={isUploading}
                 >
                   <Text className="text-white font-rubik-bold text-sm">
-                    Upload
+                    {isUploading ? 'Uploading...' : 'Upload'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1483,11 +1489,14 @@ const AddPropertyBottomSheet = ({
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  className={`${currentStep > 1 ? "flex-1" : "flex-1"} bg-blue-600 py-4 rounded-xl`}
+                  className={`${currentStep > 1 ? "flex-1" : "flex-1"} ${
+                    isUploading ? 'bg-blue-400' : 'bg-blue-600'
+                  } py-4 rounded-xl`}
                   onPress={currentStep === 4 ? handleSubmit : handleNext}
+                  disabled={isUploading}
                 >
                   <Text className="text-center text-white font-rubik-bold">
-                    {currentStep === 4 ? "Confirm & List" : "Next"}
+                    {isUploading ? "Uploading..." : currentStep === 4 ? "Confirm & List" : "Next"}
                   </Text>
                 </TouchableOpacity>
               </View>

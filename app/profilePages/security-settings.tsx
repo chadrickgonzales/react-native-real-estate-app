@@ -1,7 +1,7 @@
 import { useGlobalContext } from '@/lib/global-provider'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
     Alert,
     ScrollView,
@@ -63,7 +63,7 @@ const SecurityItem = ({
   </TouchableOpacity>
 )
 
-export default function SecuritySettings() {
+export default function SecuritySettingsPage() {
   const { user } = useGlobalContext()
   const [settings, setSettings] = useState<SecuritySettings>({
     twoFactorAuth: false,
@@ -348,7 +348,7 @@ export default function SecuritySettings() {
                 • Use a strong, unique password{'\n'}
                 • Enable two-factor authentication{'\n'}
                 • Keep your app updated{'\n'}
-                • Don't share your login credentials
+                • Don&apos;t share your login credentials
               </Text>
             </View>
           </View>

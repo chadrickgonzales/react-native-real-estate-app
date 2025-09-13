@@ -149,7 +149,12 @@ const Home = () => {
                 >
                   <View className="relative mb-4">
                     <Image
-                      source={createImageSource(property.image, images.newYork)}
+                      source={createImageSource(
+                        property.images && property.images.length > 0 
+                          ? property.images[0] 
+                          : property.image, 
+                        images.newYork
+                      )}
                       className="w-full h-48 rounded-2xl"
                       resizeMode="cover"
                     />
@@ -208,7 +213,12 @@ const Home = () => {
                   onPress={() => handleCardPress(property.$id)}
                 >
                   <Image
-                    source={createImageSource(property.image, images.newYork)}
+                    source={createImageSource(
+                      property.images && property.images.length > 0 
+                        ? property.images[0] 
+                        : property.image, 
+                      images.newYork
+                    )}
                     className="w-16 h-16 rounded-xl mr-4"
                     resizeMode="cover"
                   />

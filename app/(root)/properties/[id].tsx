@@ -68,9 +68,11 @@ const Property = () => {
       <View className="relative" style={{ height: windowHeight * 0.4 }}>
         <Image
           source={
-            !imageError && property?.image 
-              ? createImageSource(property.image) 
-              : images.newYork
+            !imageError && property?.images && property.images.length > 0
+              ? createImageSource(property.images[0])
+              : !imageError && property?.image 
+                ? createImageSource(property.image) 
+                : images.newYork
           }
           className="w-full h-full"
           resizeMode="cover"
@@ -98,7 +100,12 @@ const Property = () => {
 
         {/* Image Counter */}
         <View className="absolute bottom-10 right-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
-          <Text className="text-white text-sm font-rubik-medium">1/29</Text>
+          <Text className="text-white text-sm font-rubik-medium">
+            {property?.images && property.images.length > 0 
+              ? `1/${property.images.length}` 
+              : "1/1"
+            }
+          </Text>
         </View>
       </View>
 
