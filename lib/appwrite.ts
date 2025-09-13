@@ -802,6 +802,8 @@ export async function createProperty(propertyData: any) {
         furnitureIncluded: propertyData.furnitureIncluded || "",
         utilitiesIncludedText: propertyData.utilitiesIncludedText || "",
         amenities: propertyData.amenities || "",
+        latitude: propertyData.latitude || 0,
+        longitude: propertyData.longitude || 0,
       }
     );
 

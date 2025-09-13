@@ -2,8 +2,10 @@ import { categories } from "@/constants/data";
 import images from "@/constants/images";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useEffect, useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     Dimensions,
     Image,
@@ -14,6 +16,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import MapView, { Marker } from 'react-native-maps';
 import { createProperty } from "../lib/appwrite";
 import { useGlobalContext } from "../lib/global-provider";
 
@@ -60,6 +63,10 @@ interface PropertyData {
   description: string;
   type: string;
   images: string[];
+  
+  // Location fields
+  latitude?: number;
+  longitude?: number;
   
   // Common fields for both selling and renting
   furnishedStatus?: boolean;
@@ -149,6 +156,9 @@ const AddPropertyBottomSheet = ({
   const [errors, setErrors] = useState<Partial<PropertyData>>({});
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -207,6 +217,10 @@ const AddPropertyBottomSheet = ({
       if (!propertyData.contactPhone?.trim()) newErrors.contactPhone = "Contact phone is required";
       if (!propertyData.contactEmail?.trim()) newErrors.contactEmail = "Contact email is required";
       // Property type is now optional
+    } else if (step === 5) {
+      if (!propertyData.latitude || !propertyData.longitude) {
+        newErrors.latitude = "Please pin your property location on the map" as any;
+      }
     }
 
     setErrors(newErrors);
@@ -215,7 +229,7 @@ const AddPropertyBottomSheet = ({
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      if (currentStep < 4) {
+      if (currentStep < 5) {
         setCurrentStep(currentStep + 1);
       } else {
         handleSubmit();
@@ -237,6 +251,44 @@ const AddPropertyBottomSheet = ({
       }));
     }
   }, [user, visible]);
+
+  // Get user location when step 5 is reached
+  useEffect(() => {
+    if (currentStep === 5 && !userLocation && !locationError) {
+      getCurrentLocation();
+    }
+  }, [currentStep, userLocation, locationError]);
+
+  const getCurrentLocation = async () => {
+    setIsLoadingLocation(true);
+    setLocationError(null);
+    
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationError('Location permission denied');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      
+      setUserLocation(location);
+      
+      // Set initial property location to user's location
+      setPropertyData(prev => ({
+        ...prev,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      }));
+    } catch (error) {
+      console.error('Error getting location:', error);
+      setLocationError('Failed to get your location');
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
 
   const handleSubmit = async () => {
     try {
@@ -278,6 +330,10 @@ const AddPropertyBottomSheet = ({
                   description: "",
                   type: "",
                   images: [],
+                  
+                  // Location fields
+                  latitude: undefined,
+                  longitude: undefined,
                   
                   // Common fields for both selling and renting
                   furnishedStatus: false,
@@ -1376,6 +1432,136 @@ const AddPropertyBottomSheet = ({
     </View>
   );
 
+  const renderStep5 = () => (
+    <View className="flex-1">
+      {/* Header */}
+      <View className="p-6 bg-white border-b border-gray-200">
+        <View className="items-center mb-4">
+          <View className="w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-4">
+            <Ionicons name="location" size={32} color="#10B981" />
+          </View>
+          <Text className="text-2xl font-rubik-bold text-black mb-2">
+            Pin Your Property Location
+          </Text>
+          <Text className="text-base font-rubik text-gray-600 text-center">
+            Tap on the map to set the exact location of your property
+          </Text>
+        </View>
+      </View>
+
+      {/* Map Container */}
+      <View className="flex-1 relative">
+        {isLoadingLocation ? (
+          <View className="flex-1 items-center justify-center bg-gray-100">
+            <ActivityIndicator size="large" color="#10B981" />
+            <Text className="text-gray-600 font-rubik mt-4">Getting your location...</Text>
+          </View>
+        ) : locationError ? (
+          <View className="flex-1 items-center justify-center bg-gray-100 p-6">
+            <Ionicons name="location-outline" size={64} color="#EF4444" />
+            <Text className="text-lg font-rubik-bold text-gray-800 mt-4 mb-2">Location Error</Text>
+            <Text className="text-gray-600 font-rubik text-center mb-6">{locationError}</Text>
+            <TouchableOpacity
+              onPress={getCurrentLocation}
+              className="bg-green-600 px-6 py-3 rounded-xl"
+            >
+              <Text className="text-white font-rubik-bold">Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : userLocation ? (
+          <MapView
+            style={{ flex: 1 }}
+            initialRegion={{
+              latitude: userLocation.coords.latitude,
+              longitude: userLocation.coords.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+            onPress={(event) => {
+              const { latitude, longitude } = event.nativeEvent.coordinate;
+              setPropertyData(prev => ({
+                ...prev,
+                latitude,
+                longitude,
+              }));
+            }}
+            showsUserLocation={true}
+            showsMyLocationButton={false}
+          >
+            {/* User's current location marker */}
+            <Marker
+              coordinate={{
+                latitude: userLocation.coords.latitude,
+                longitude: userLocation.coords.longitude,
+              }}
+              title="Your Location"
+              description="Your current location"
+              pinColor="blue"
+            />
+            
+            {/* Property location marker */}
+            {propertyData.latitude && propertyData.longitude && (
+              <Marker
+                coordinate={{
+                  latitude: propertyData.latitude,
+                  longitude: propertyData.longitude,
+                }}
+                title="Property Location"
+                description="Tap to move this marker"
+                pinColor="red"
+                draggable
+                onDragEnd={(event) => {
+                  const { latitude, longitude } = event.nativeEvent.coordinate;
+                  setPropertyData(prev => ({
+                    ...prev,
+                    latitude,
+                    longitude,
+                  }));
+                }}
+              />
+            )}
+          </MapView>
+        ) : null}
+
+        {/* Map Instructions Overlay */}
+        <View className="absolute top-4 left-4 right-4 bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg">
+          <View className="flex-row items-center">
+            <Ionicons name="information-circle" size={20} color="#10B981" />
+            <Text className="text-sm font-rubik text-gray-700 ml-2 flex-1">
+              {propertyData.latitude && propertyData.longitude 
+                ? "Location pinned! You can drag the red marker to adjust."
+                : "Tap anywhere on the map to pin your property location"
+              }
+            </Text>
+          </View>
+        </View>
+
+        {/* Location Details */}
+        {propertyData.latitude && propertyData.longitude && (
+          <View className="absolute bottom-4 left-4 right-4 bg-white rounded-xl p-4 shadow-lg">
+            <Text className="text-sm font-rubik-bold text-gray-800 mb-2">Property Coordinates</Text>
+            <Text className="text-xs font-rubik text-gray-600">
+              Latitude: {propertyData.latitude.toFixed(6)}
+            </Text>
+            <Text className="text-xs font-rubik text-gray-600">
+              Longitude: {propertyData.longitude.toFixed(6)}
+            </Text>
+          </View>
+        )}
+
+        {/* Error Message */}
+        {errors.latitude && (
+          <View className="absolute bottom-4 left-4 right-4 bg-red-50 border border-red-200 rounded-xl p-4 shadow-lg">
+            <View className="flex-row items-center">
+              <Ionicons name="warning" size={20} color="#EF4444" />
+              <Text className="text-red-600 font-rubik ml-2 flex-1">{errors.latitude}</Text>
+            </View>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -1389,56 +1575,60 @@ const AddPropertyBottomSheet = ({
           style={{ height: windowHeight * 0.9 }}
         >
           {/* Header */}
-          <View className="flex-row items-center justify-between p-6 border-b border-gray-200">
-            <View className="flex-row items-center">
-              <Text className="text-xl font-rubik-bold text-black mr-4">Add Property</Text>
-              <View className="flex-row items-center">
-                {[1, 2, 3, 4].map((step) => (
-                  <View key={step} className="flex-row items-center">
-                    <View
-                      className={`w-8 h-8 rounded-full items-center justify-center ${
-                        step <= currentStep ? "bg-blue-600" : "bg-gray-200"
-                      }`}
-                    >
-                      <Text
-                        className={`text-sm font-rubik-bold ${
-                          step <= currentStep ? "text-white" : "text-gray-500"
-                        }`}
-                      >
-                        {step}
-                      </Text>
-                    </View>
-                    {step < 3 && (
-                      <View
-                        className={`w-8 h-1 mx-2 ${
-                          step < currentStep ? "bg-blue-600" : "bg-gray-200"
-                        }`}
-                      />
-                    )}
-                  </View>
-                ))}
-              </View>
-            </View>
-            <View className="flex-row items-center space-x-3">
-              {currentStep === 4 && (
-                <TouchableOpacity
-                  className={`px-4 py-2 rounded-lg ${
-                    isUploading ? 'bg-blue-400' : 'bg-blue-600'
-                  }`}
-                  onPress={handleSubmit}
-                  disabled={isUploading}
-                >
-                  <Text className="text-white font-rubik-bold text-sm">
-                    {isUploading ? 'Uploading...' : 'Upload'}
-                  </Text>
-                </TouchableOpacity>
-              )}
+          <View className="p-6 border-b border-gray-200">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-xl font-rubik-bold text-black">Add Property</Text>
               <TouchableOpacity
                 onPress={onClose}
                 className="w-8 h-8 items-center justify-center"
               >
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
+            </View>
+            
+            {/* Submit Button - Only show on Step 5 */}
+            {currentStep === 5 && (
+              <View className="mb-4">
+                <TouchableOpacity
+                  className={`w-full py-3 rounded-xl ${
+                    isUploading ? 'bg-blue-400' : 'bg-blue-600'
+                  }`}
+                  onPress={handleSubmit}
+                  disabled={isUploading}
+                >
+                  <Text className="text-white font-rubik-bold text-center text-lg">
+                    {isUploading ? 'Uploading...' : 'Submit Property'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {/* Progress Steps */}
+            <View className="flex-row items-center justify-center">
+              {[1, 2, 3, 4, 5].map((step) => (
+                <View key={step} className="flex-row items-center">
+                  <View
+                    className={`w-8 h-8 rounded-full items-center justify-center ${
+                      step <= currentStep ? "bg-blue-600" : "bg-gray-200"
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-rubik-bold ${
+                        step <= currentStep ? "text-white" : "text-gray-500"
+                      }`}
+                    >
+                      {step}
+                    </Text>
+                  </View>
+                  {step < 5 && (
+                    <View
+                      className={`w-8 h-1 mx-2 ${
+                        step < currentStep ? "bg-blue-600" : "bg-gray-200"
+                      }`}
+                    />
+                  )}
+                </View>
+              ))}
             </View>
           </View>
 
@@ -1474,8 +1664,10 @@ const AddPropertyBottomSheet = ({
 
           {currentStep === 4 && renderStep4()}
 
+          {currentStep === 5 && renderStep5()}
+
           {/* Bottom Action Bar */}
-          {currentStep < 4 && (
+          {currentStep < 5 && (
             <View className="p-6 border-t border-gray-200">
               <View className="flex-row space-x-3">
                 {currentStep > 1 && (
@@ -1492,11 +1684,11 @@ const AddPropertyBottomSheet = ({
                   className={`${currentStep > 1 ? "flex-1" : "flex-1"} ${
                     isUploading ? 'bg-blue-400' : 'bg-blue-600'
                   } py-4 rounded-xl`}
-                  onPress={currentStep === 4 ? handleSubmit : handleNext}
+                  onPress={currentStep === 5 ? handleSubmit : handleNext}
                   disabled={isUploading}
                 >
                   <Text className="text-center text-white font-rubik-bold">
-                    {isUploading ? "Uploading..." : currentStep === 4 ? "Confirm & List" : "Next"}
+                    {isUploading ? "Uploading..." : currentStep === 5 ? "Confirm & List" : "Next"}
                   </Text>
                 </TouchableOpacity>
               </View>
