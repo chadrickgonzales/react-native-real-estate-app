@@ -19,7 +19,7 @@ import { useAppwrite } from "@/lib/useAppwrite";
 const Property = () => {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [imageError, setImageError] = useState(false);
-  const [thumbnailError, setThumbnailError] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -38,6 +38,68 @@ const Property = () => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Not specified';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getPropertyTypeDisplay = () => {
+    if (property?.propertyType === 'sell') return 'For Sale';
+    if (property?.propertyType === 'rent') return 'For Rent';
+    return property?.type || 'Property';
+  };
+
+  const getPriceDisplay = () => {
+    if (property?.propertyType === 'rent') {
+      return `${formatPrice(property?.price || 0)}/month`;
+    }
+    return formatPrice(property?.price || 0);
+  };
+
+  const getAmenitiesList = () => {
+    if (!property?.amenities) return [];
+    try {
+      return property.amenities.split(',').map((amenity: string) => amenity.trim()).filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+
+  const getPropertyFeatures = () => {
+    const features = [];
+    
+    if (property?.furnishedStatus) features.push('Furnished');
+    if (property?.petFriendly) features.push('Pet Friendly');
+    if (property?.hasPool) features.push('Swimming Pool');
+    if (property?.hasGarage) features.push('Garage');
+    if (property?.hasHOA) features.push('HOA Community');
+    if (property?.utilitiesIncluded) features.push('Utilities Included');
+    if (property?.smokingAllowed) features.push('Smoking Allowed');
+    if (property?.backgroundCheckRequired) features.push('Background Check Required');
+    
+    return features;
+  };
+
+  const nextImage = () => {
+    if (property?.images && property.images.length > 1) {
+      setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
+    }
+  };
+
+  const prevImage = () => {
+    if (property?.images && property.images.length > 1) {
+      setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length);
+    }
   };
 
   if (loading) {
@@ -62,17 +124,19 @@ const Property = () => {
     );
   }
 
+  const currentImage = property.images && property.images.length > 0 
+    ? property.images[currentImageIndex] 
+    : property.image;
+
   return (
     <View className="flex-1 bg-black">
       {/* Hero Image Section */}
       <View className="relative" style={{ height: windowHeight * 0.4 }}>
         <Image
           source={
-            !imageError && property?.images && property.images.length > 0
-              ? createImageSource(property.images[0])
-              : !imageError && property?.image 
-                ? createImageSource(property.image) 
-                : images.newYork
+            !imageError && currentImage
+              ? createImageSource(currentImage)
+              : images.newYork
           }
           className="w-full h-full"
           resizeMode="cover"
@@ -98,11 +162,32 @@ const Property = () => {
           </View>
         </View>
 
+        {/* Image Navigation */}
+        {property.images && property.images.length > 1 && (
+          <>
+            <TouchableOpacity
+              onPress={prevImage}
+              className="absolute left-4 top-1/2 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full items-center justify-center"
+              style={{ transform: [{ translateY: -20 }] }}
+            >
+              <Ionicons name="chevron-back" size={20} color="white" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={nextImage}
+              className="absolute right-4 top-1/2 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full items-center justify-center"
+              style={{ transform: [{ translateY: -20 }] }}
+            >
+              <Ionicons name="chevron-forward" size={20} color="white" />
+            </TouchableOpacity>
+          </>
+        )}
+
         {/* Image Counter */}
         <View className="absolute bottom-10 right-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
           <Text className="text-white text-sm font-rubik-medium">
-            {property?.images && property.images.length > 0 
-              ? `1/${property.images.length}` 
+            {property.images && property.images.length > 0 
+              ? `${currentImageIndex + 1}/${property.images.length}` 
               : "1/1"
             }
           </Text>
@@ -116,149 +201,238 @@ const Property = () => {
           contentContainerClassName="pb-60 mt-5"
         >
           <View className="px-6 pt-1">
-            {/* Property Address */}
-            <Text className="text-2xl font-rubik-bold text-black mb-2">
-              {property?.address || "1301 Montego, Walnut Creek, CA 94598"}
-            </Text>
-            
-            <Text className="text-black font-rubik  mb-1">
-              Entire cabin in berkeley springs, west virginia
-            </Text>
-            
-            <Text className="text-sm font-rubik text-gray-600 mb-4">
-              4 guests · 2 bedrooms · 2 beds · 2 baths
-            </Text>
+            {/* Property Header */}
+            <View className="mb-4">
+              <Text className="text-2xl font-rubik-bold text-black mb-2">
+                {property.name || 'Property'}
+              </Text>
+              
+              <Text className="text-lg font-rubik text-gray-600 mb-1">
+                {getPropertyTypeDisplay()} • {property.type || 'Property Type'}
+              </Text>
+              
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="location-outline" size={16} color="#666" />
+                <Text className="text-base font-rubik text-gray-600 ml-1">
+                  {property.address || 'Address not specified'}
+                </Text>
+              </View>
 
-            {/* Ratings Section */}
-            <View className="flex-row items-center justify-between mb-4 bg-gray-100 rounded-2xl p-4">
-              <View className="flex-col items-center">
-                <Text className="text-xl font-rubik-medium text-black">4.98</Text>
-                <View className="flex-row">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons 
-                      key={star} 
-                      name="star" 
-                      size={14} 
-                      color="#FFD700" 
-                    />
+              <View className="flex-row items-center">
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text className="text-base font-rubik text-gray-600 ml-1">
+                  {property.rating || '4.5'} • {property.reviewsCount || 0} reviews
+                </Text>
+              </View>
+            </View>
+
+            {/* Property Details Grid */}
+            <View className="bg-gray-50 rounded-2xl p-4 mb-4">
+              <Text className="text-lg font-rubik-bold text-black mb-3">Property Details</Text>
+              <View className="flex-row flex-wrap">
+                <View className="w-1/2 mb-3">
+                  <View className="flex-row items-center">
+                    <Ionicons name="bed" size={20} color="#666" />
+                    <Text className="text-base font-rubik text-gray-700 ml-2">
+                      {property.bedrooms || 0} bedrooms
+                    </Text>
+                  </View>
+                </View>
+                <View className="w-1/2 mb-3">
+                  <View className="flex-row items-center">
+                    <Ionicons name="water" size={20} color="#666" />
+                    <Text className="text-base font-rubik text-gray-700 ml-2">
+                      {property.bathrooms || 0} bathrooms
+                    </Text>
+                  </View>
+                </View>
+                <View className="w-1/2 mb-3">
+                  <View className="flex-row items-center">
+                    <Ionicons name="resize" size={20} color="#666" />
+                    <Text className="text-base font-rubik text-gray-700 ml-2">
+                      {property.area || 0} sq ft
+                    </Text>
+                  </View>
+                </View>
+                <View className="w-1/2 mb-3">
+                  <View className="flex-row items-center">
+                    <Ionicons name="calendar" size={20} color="#666" />
+                    <Text className="text-base font-rubik text-gray-700 ml-2">
+                      Available: {formatDate(property.availableDate)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Property Features */}
+            {getPropertyFeatures().length > 0 && (
+              <View className="mb-4">
+                <Text className="text-lg font-rubik-bold text-black mb-3">Property Features</Text>
+                <View className="flex-row flex-wrap">
+                  {getPropertyFeatures().map((feature, index) => (
+                    <View key={index} className="w-1/2 flex-row items-center mb-2">
+                      <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
+                      <Text className="text-base font-rubik text-gray-600 ml-2">{feature}</Text>
+                    </View>
                   ))}
                 </View>
               </View>
-              
-              <View className="items-center border-l border-r border-gray-00 px-10">
-                <Ionicons name="link" size={20} color="#666" />
-                <Text className="text-sm font-rubik text-gray-600 mt-1">Guest favorite</Text>
-              </View>
-              
-              <View className="items-center">
-                <Text className="text-xl font-rubik-medium text-black">239</Text>
-                <Text className="text-sm font-rubik text-gray-600">Reviews</Text>
-              </View>
-            </View>
-
-            {/* Lower Price Section */}
-            <View className="  mb-4">
-              <Text className="text-medium font-rubik-medium text-black mb-1">Lower price</Text>
-              <Text className="text-sm font-rubik text-gray-600">
-                Your dates are $2,195 less than the avg. nightly rate of the last 30 days.
-              </Text>
-            </View>
-
-            {/* Saved to Location */}
-            <View className="flex-row items-center justify-between bg-gray-100 rounded-2xl p-4 mb-4">
-               <View className="flex-row items-center">
-                 <Image
-                   source={
-                     !thumbnailError && property?.image 
-                       ? createImageSource(property.image) 
-                       : images.newYork
-                   }
-                   className="w-12 h-12 rounded-lg mr-3"
-                   onError={() => {
-                     console.log('Thumbnail image load error, using fallback');
-                     setThumbnailError(true);
-                   }}
-                 />
-                 <Text className="text-base font-rubik text-black">Saved to Walnut creek</Text>
-               </View>
-               <TouchableOpacity>
-                 <Text className="text-blue-600 font-rubik-medium">Change</Text>
-               </TouchableOpacity>
-             </View>
-
-            {/* Property Details */}
-            <View className="mb-4">
-              <Text className="text-medium font-rubik-medium text-black mb-3">About this place</Text>
-              <Text className="text-sm font-rubik text-gray-600 leading-6">
-                {property?.description || "Experience luxury living in this stunning modern home featuring panoramic views, premium finishes, and resort-style amenities. Perfect for families seeking comfort and elegance."}
-              </Text>
-            </View>
+            )}
 
             {/* Amenities */}
-            <View className="mb-4">
-              <Text className="text-medium font-rubik-medium text-black mb-3">What this place offers</Text>
-              <View className="flex-row flex-wrap">
-                {['WiFi', 'Kitchen', 'Parking', 'Pool', 'Gym', 'Laundry'].map((amenity, index) => (
-                  <View key={index} className="w-1/2 flex-row items-center mb-3">
-                    <Ionicons name="checkmark" size={16} color="#22C55E" />
-                    <Text className="text-base font-rubik text-gray-600 ml-2">{amenity}</Text>
+            {getAmenitiesList().length > 0 && (
+              <View className="mb-4">
+                <Text className="text-lg font-rubik-bold text-black mb-3">Amenities</Text>
+                <View className="flex-row flex-wrap">
+                  {getAmenitiesList().map((amenity: string, index: number) => (
+                    <View key={index} className="bg-blue-100 px-3 py-2 rounded-full mr-2 mb-2">
+                      <Text className="text-blue-800 font-rubik text-sm">{amenity}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Description */}
+            {property.description && (
+              <View className="mb-4">
+                <Text className="text-lg font-rubik-bold text-black mb-3">Description</Text>
+                <Text className="text-base font-rubik text-gray-600 leading-6">
+                  {property.description}
+                </Text>
+              </View>
+            )}
+
+            {/* Contact Information */}
+            <View className="bg-gray-50 rounded-2xl p-4 mb-4">
+              <Text className="text-lg font-rubik-bold text-black mb-3">Contact Information</Text>
+              <View className="space-y-2">
+                {property.contactPhone && (
+                  <View className="flex-row items-center">
+                    <Ionicons name="call" size={20} color="#666" />
+                    <Text className="text-base font-rubik text-gray-700 ml-2">
+                      {property.contactPhone}
+                    </Text>
                   </View>
-                ))}
+                )}
+                {property.contactEmail && (
+                  <View className="flex-row items-center">
+                    <Ionicons name="mail" size={20} color="#666" />
+                    <Text className="text-base font-rubik text-gray-700 ml-2">
+                      {property.contactEmail}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
-            {/* Reviews Preview */}
-            <View className="mb-4">
-              <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-row items-center">
-                  <Ionicons name="star" size={20} color="#FFD700" />
-                  <Text className="text-medium font-rubik-medium text-black ml-2">4.98 · 239 reviews</Text>
-                </View>
-                <TouchableOpacity>
-                  <Text className="text-blue-600 font-rubik-medium">Show all</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {/* Sample Review */}
-              <View className="bg-gray-50 rounded-2xl p-4">
-                <View className="flex-row items-center mb-2">
-                  <Image
-                    source={images.avatar}
-                    className="w-10 h-10 rounded-full mr-3"
-                  />
-                  <View>
-                    <Text className="font-rubik-bold text-black">Sarah M.</Text>
-                    <Text className="text-sm font-rubik text-gray-600">March 2024</Text>
+            {/* Additional Details for Rentals */}
+            {property.propertyType === 'rent' && (
+              <View className="mb-4">
+                <Text className="text-lg font-rubik-bold text-black mb-3">Rental Details</Text>
+                <View className="bg-gray-50 rounded-2xl p-4">
+                  <View className="space-y-2">
+                    {property.leaseDuration && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Lease Duration:</Text>
+                        <Text className="text-base font-rubik text-black">{property.leaseDuration}</Text>
+                      </View>
+                    )}
+                    {property.deposit && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Security Deposit:</Text>
+                        <Text className="text-base font-rubik text-black">{property.deposit}</Text>
+                      </View>
+                    )}
+                    {property.petDeposit && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Pet Deposit:</Text>
+                        <Text className="text-base font-rubik text-black">{property.petDeposit}</Text>
+                      </View>
+                    )}
+                    {property.utilities && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Utilities:</Text>
+                        <Text className="text-base font-rubik text-black">{property.utilities}</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
-                 <Text className="text-base font-rubik text-gray-600">
-                   &ldquo;Absolutely stunning property! The views were incredible and the amenities were top-notch. Highly recommend!&rdquo;
-                 </Text>
               </View>
-            </View>
+            )}
+
+            {/* Additional Details for Sales */}
+            {property.propertyType === 'sell' && (
+              <View className="mb-4">
+                <Text className="text-lg font-rubik-bold text-black mb-3">Property Information</Text>
+                <View className="bg-gray-50 rounded-2xl p-4">
+                  <View className="space-y-2">
+                    {property.yearBuilt && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Year Built:</Text>
+                        <Text className="text-base font-rubik text-black">{property.yearBuilt}</Text>
+                      </View>
+                    )}
+                    {property.propertyCondition && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Condition:</Text>
+                        <Text className="text-base font-rubik text-black">{property.propertyCondition}</Text>
+                      </View>
+                    )}
+                    {property.lotSize && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Lot Size:</Text>
+                        <Text className="text-base font-rubik text-black">{property.lotSize} sq ft</Text>
+                      </View>
+                    )}
+                    {property.parkingSpaces && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Parking:</Text>
+                        <Text className="text-base font-rubik text-black">{property.parkingSpaces} spaces</Text>
+                      </View>
+                    )}
+                    {property.hoaFees && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">HOA Fees:</Text>
+                        <Text className="text-base font-rubik text-black">{property.hoaFees}/month</Text>
+                      </View>
+                    )}
+                    {property.propertyTaxes && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-base font-rubik text-gray-600">Property Taxes:</Text>
+                        <Text className="text-base font-rubik text-black">{property.propertyTaxes}/year</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
 
         {/* Bottom Action Bar */}
-        <View className="absolute bottom-20 left-0 right-0 bg-white px-6 py-4" style={{ paddingBottom: 34 }}>
+        <View className="absolute bottom-20 left-0 right-0 bg-white px-6 py-4 border-t border-gray-200" style={{ paddingBottom: 34 }}>
           <View className="flex-row items-center justify-between">
             <View>
-              <Text className="text-xl font-rubik-medium text-black ml-4">
-                {formatPrice(property?.price || 2195)}/mo
+              <Text className="text-2xl font-rubik-bold text-black">
+                {getPriceDisplay()}
               </Text>
-              <View className="flex-row items-center mt-1 bg-gray-100 rounded-full px-4 py-1 shadow-md">
-                <Text className="text-sm font-rubik text-black-300 ml-1">Free cancellation</Text>
-              </View>
+              <Text className="text-sm font-rubik text-gray-600">
+                {property.propertyType === 'rent' ? 'Monthly rent' : 'Total price'}
+              </Text>
             </View>
             
             <TouchableOpacity className="bg-blue-600 rounded-full px-8 py-4">
-              <Text className="text-white font-rubik text-medium">Request to chat</Text>
+              <Text className="text-white font-rubik-bold text-base">
+                {property.propertyType === 'rent' ? 'Contact Landlord' : 'Contact Agent'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
-       </View>
-     </View>
-   );
- };
+      </View>
+    </View>
+  );
+};
 
 export default Property;
