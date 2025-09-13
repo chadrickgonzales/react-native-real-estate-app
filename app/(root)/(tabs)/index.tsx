@@ -26,7 +26,7 @@ const Home = () => {
   const { user } = useGlobalContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<'rent' | 'sell'>('sell');
-  const [selectedCategory, setSelectedCategory] = useState('Trending');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   
   const { height: screenHeight } = Dimensions.get('window');
 

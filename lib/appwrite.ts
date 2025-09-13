@@ -321,7 +321,7 @@ export async function getLatestProperties(propertyType?: string, filter?: string
       buildQuery.push(Query.equal("propertyType", propertyType));
     }
     
-    if (filter && filter !== '' && filter !== 'Trending') {
+    if (filter && filter !== '' && filter !== 'All') {
       buildQuery.push(Query.equal("type", filter));
     }
     
@@ -375,7 +375,7 @@ export async function getProperties({
     
     const buildQuery = [Query.orderDesc("$createdAt")];
 
-    if (filter && filter !== "Trending")
+    if (filter && filter !== "All")
       buildQuery.push(Query.equal("type", filter));
 
     if (propertyType && propertyType !== '')

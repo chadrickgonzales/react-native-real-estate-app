@@ -12,14 +12,14 @@ interface FiltersProps {
 const Filters: React.FC<FiltersProps> = ({ propertyType, onCategoryChange }) => {
   const params = useLocalSearchParams<{ filter?: string }>();
   const [selectedCategory, setSelectedCategory] = useState(
-    params.filter || "Trending"
+    params.filter || "All"
   );
 
   const handleCategoryPress = (category: string) => {
     if (selectedCategory === category) {
-      setSelectedCategory("Trending");
-      router.setParams({ filter: "Trending" });
-      onCategoryChange?.("Trending");
+      setSelectedCategory("All");
+      router.setParams({ filter: "All" });
+      onCategoryChange?.("All");
       return;
     }
 
@@ -32,12 +32,12 @@ const Filters: React.FC<FiltersProps> = ({ propertyType, onCategoryChange }) => 
   const getFilteredCategories = () => {
     if (propertyType === 'rent') {
       return categories.filter(cat => 
-        ['Trending', 'House', 'Apartment', 'Villa', 'Studios', 'Apartments', 'Townhomes'].includes(cat.category)
+        ['All', 'House', 'Apartment', 'Villa', 'Studios', 'Apartments', 'Townhomes'].includes(cat.category)
       );
     }
     if (propertyType === 'sell') {
       return categories.filter(cat => 
-        ['Trending', 'House', 'Villa', 'Condos', 'Duplexes', 'Townhomes'].includes(cat.category)
+        ['All', 'House', 'Villa', 'Condos', 'Duplexes', 'Townhomes'].includes(cat.category)
       );
     }
     return categories;
