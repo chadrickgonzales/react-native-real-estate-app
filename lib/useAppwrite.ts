@@ -47,6 +47,7 @@ export const useAppwrite = <T, P extends Record<string, string | number>>({
     if (!skip) {
       fetchData(params);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refetch = async (newParams: P) => await fetchData(newParams);

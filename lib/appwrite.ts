@@ -311,13 +311,20 @@ export async function signUp({
   }
 }
 
-export async function getLatestProperties() {
+export async function getLatestProperties(propertyType?: string) {
   try {
-    console.log("Fetching latest properties...");
+    console.log("Fetching latest properties with propertyType:", propertyType);
+    
+    const buildQuery = [Query.orderDesc("$createdAt"), Query.limit(5)];
+    
+    if (propertyType && propertyType !== '') {
+      buildQuery.push(Query.equal("propertyType", propertyType));
+    }
+    
     const result = await databases.listDocuments(
       config.databaseId!,
       config.propertiesCollectionId!,
-      [Query.orderDesc("$createdAt"), Query.limit(5)]
+      buildQuery
     );
 
     console.log("Raw properties from database:", result.documents.length);
@@ -352,18 +359,23 @@ export async function getProperties({
   filter,
   query,
   limit,
+  propertyType,
 }: {
   filter: string;
   query: string;
   limit?: number;
+  propertyType?: string;
 }) {
   try {
-    console.log("Fetching properties with params:", { filter, query, limit });
+    console.log("Fetching properties with params:", { filter, query, limit, propertyType });
     
     const buildQuery = [Query.orderDesc("$createdAt")];
 
     if (filter && filter !== "All")
       buildQuery.push(Query.equal("type", filter));
+
+    if (propertyType && propertyType !== '')
+      buildQuery.push(Query.equal("propertyType", propertyType));
 
     if (query)
       buildQuery.push(

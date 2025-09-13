@@ -23,19 +23,29 @@ import { useAppwrite } from "@/lib/useAppwrite";
 const Home = () => {
   const { user } = useGlobalContext();
   const [searchQuery, setSearchQuery] = useState('');
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState<'rent' | 'sell'>('sell');
 
   // Fetch latest properties for recommended section
-  const { data: latestProperties, loading: latestPropertiesLoading } = useAppwrite({
-    fn: getLatestProperties,
+  const { data: latestProperties, loading: latestPropertiesLoading, refetch: refetchLatest } = useAppwrite({
+    fn: ({ propertyType }: { propertyType: string }) => 
+      getLatestProperties(propertyType),
+    params: { propertyType: propertyTypeFilter },
   });
 
   // Fetch properties for most popular section (sorted by rating)
-  const { data: popularProperties, loading: popularPropertiesLoading } = useAppwrite({
-    fn: getProperties,
+  const { data: popularProperties, loading: popularPropertiesLoading, refetch: refetchPopular } = useAppwrite({
+    fn: ({ filter, query, limit, propertyType }: { filter: string; query: string; limit: number; propertyType: string }) => 
+      getProperties({
+        filter,
+        query,
+        limit,
+        propertyType,
+      }),
     params: {
       filter: "",
       query: "",
       limit: 4,
+      propertyType: propertyTypeFilter,
     },
   });
 
@@ -111,17 +121,40 @@ const Home = () => {
 
            
             
-            <TouchableOpacity className="bg-white w-16 h-16 mb-6 rounded-full items-center justify-center shadow-md">
-                <Ionicons name="options-outline" size={20} color="#191D31" />
-              </TouchableOpacity>
+            <TouchableOpacity 
+              className="bg-white w-16 h-16 mb-6 rounded-full items-center justify-center shadow-md"
+              activeOpacity={1}
+              onPress={async () => {
+                const newFilter = propertyTypeFilter === 'sell' ? 'rent' : 'sell';
+                setPropertyTypeFilter(newFilter);
+                
+                // Manually refetch data with new filter
+                await refetchLatest({ propertyType: newFilter });
+                await refetchPopular({ 
+                  filter: "", 
+                  query: "", 
+                  limit: 4, 
+                  propertyType: newFilter 
+                });
+              }}
+            >
+              <Ionicons 
+                name={
+                  propertyTypeFilter === 'sell' 
+                    ? 'home-outline' 
+                    : 'key-outline'
+                }
+                size={20} 
+                color="#191D31" 
+              />
+            </TouchableOpacity>
             
           </View>
 
 
-
           {/* Category Filters */}
           <View className="bg-white px-2 py-2 rounded-full shadow-md mb-5">
-            <Filters />
+            <Filters propertyType={propertyTypeFilter} />
           </View>
         </View>
 
