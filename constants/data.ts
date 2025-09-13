@@ -60,7 +60,6 @@ export const categories = [
   { title: "House", category: "House" },
   { title: "Apartment", category: "Apartment" },
   { title: "Villa", category: "Villa" },
-  { title: "All", category: "All" },
   { title: "Condos", category: "Condos" },
   { title: "Duplexes", category: "Duplexes" },
   { title: "Studios", category: "Studios" },

@@ -6,9 +6,10 @@ import { categories } from "@/constants/data";
 
 interface FiltersProps {
   propertyType?: 'rent' | 'sell';
+  onCategoryChange?: (category: string) => void;
 }
 
-const Filters: React.FC<FiltersProps> = ({ propertyType }) => {
+const Filters: React.FC<FiltersProps> = ({ propertyType, onCategoryChange }) => {
   const params = useLocalSearchParams<{ filter?: string }>();
   const [selectedCategory, setSelectedCategory] = useState(
     params.filter || "Trending"
@@ -18,23 +19,25 @@ const Filters: React.FC<FiltersProps> = ({ propertyType }) => {
     if (selectedCategory === category) {
       setSelectedCategory("Trending");
       router.setParams({ filter: "Trending" });
+      onCategoryChange?.("Trending");
       return;
     }
 
     setSelectedCategory(category);
     router.setParams({ filter: category });
+    onCategoryChange?.(category);
   };
 
   // Filter categories based on property type
   const getFilteredCategories = () => {
     if (propertyType === 'rent') {
       return categories.filter(cat => 
-        ['Trending', 'House', 'Apartment', 'Villa', 'All', 'Studios', 'Apartments', 'Townhomes'].includes(cat.category)
+        ['Trending', 'House', 'Apartment', 'Villa', 'Studios', 'Apartments', 'Townhomes'].includes(cat.category)
       );
     }
     if (propertyType === 'sell') {
       return categories.filter(cat => 
-        ['Trending', 'House', 'Villa', 'All', 'Condos', 'Duplexes', 'Townhomes'].includes(cat.category)
+        ['Trending', 'House', 'Villa', 'Condos', 'Duplexes', 'Townhomes'].includes(cat.category)
       );
     }
     return categories;

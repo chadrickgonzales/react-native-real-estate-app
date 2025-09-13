@@ -24,12 +24,13 @@ const Home = () => {
   const { user } = useGlobalContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<'rent' | 'sell'>('sell');
+  const [selectedCategory, setSelectedCategory] = useState('Trending');
 
   // Fetch latest properties for recommended section
   const { data: latestProperties, loading: latestPropertiesLoading, refetch: refetchLatest } = useAppwrite({
-    fn: ({ propertyType }: { propertyType: string }) => 
-      getLatestProperties(propertyType),
-    params: { propertyType: propertyTypeFilter },
+    fn: ({ propertyType, filter }: { propertyType: string; filter: string }) => 
+      getLatestProperties(propertyType, filter),
+    params: { propertyType: propertyTypeFilter, filter: selectedCategory },
   });
 
   // Fetch properties for most popular section (sorted by rating)
@@ -42,7 +43,7 @@ const Home = () => {
         propertyType,
       }),
     params: {
-      filter: "",
+      filter: selectedCategory,
       query: "",
       limit: 4,
       propertyType: propertyTypeFilter,
@@ -128,10 +129,10 @@ const Home = () => {
                 const newFilter = propertyTypeFilter === 'sell' ? 'rent' : 'sell';
                 setPropertyTypeFilter(newFilter);
                 
-                // Manually refetch data with new filter
-                await refetchLatest({ propertyType: newFilter });
+                // Manually refetch data with new filter and current category
+                await refetchLatest({ propertyType: newFilter, filter: selectedCategory });
                 await refetchPopular({ 
-                  filter: "", 
+                  filter: selectedCategory, 
                   query: "", 
                   limit: 4, 
                   propertyType: newFilter 
@@ -154,7 +155,20 @@ const Home = () => {
 
           {/* Category Filters */}
           <View className="bg-white px-2 py-2 rounded-full shadow-md mb-5">
-            <Filters propertyType={propertyTypeFilter} />
+            <Filters 
+              propertyType={propertyTypeFilter} 
+              onCategoryChange={async (category) => {
+                setSelectedCategory(category);
+                // Refetch data with new category filter
+                await refetchLatest({ propertyType: propertyTypeFilter, filter: category });
+                await refetchPopular({ 
+                  filter: category, 
+                  query: "", 
+                  limit: 4, 
+                  propertyType: propertyTypeFilter 
+                });
+              }}
+            />
           </View>
         </View>
 

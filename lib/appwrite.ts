@@ -311,14 +311,18 @@ export async function signUp({
   }
 }
 
-export async function getLatestProperties(propertyType?: string) {
+export async function getLatestProperties(propertyType?: string, filter?: string) {
   try {
-    console.log("Fetching latest properties with propertyType:", propertyType);
+    console.log("Fetching latest properties with propertyType:", propertyType, "filter:", filter);
     
     const buildQuery = [Query.orderDesc("$createdAt"), Query.limit(5)];
     
     if (propertyType && propertyType !== '') {
       buildQuery.push(Query.equal("propertyType", propertyType));
+    }
+    
+    if (filter && filter !== '' && filter !== 'Trending') {
+      buildQuery.push(Query.equal("type", filter));
     }
     
     const result = await databases.listDocuments(
@@ -371,7 +375,7 @@ export async function getProperties({
     
     const buildQuery = [Query.orderDesc("$createdAt")];
 
-    if (filter && filter !== "All")
+    if (filter && filter !== "Trending")
       buildQuery.push(Query.equal("type", filter));
 
     if (propertyType && propertyType !== '')
