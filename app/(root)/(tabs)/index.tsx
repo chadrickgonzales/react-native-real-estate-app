@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   ScrollView,
   Text,
@@ -25,6 +27,8 @@ const Home = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<'rent' | 'sell'>('sell');
   const [selectedCategory, setSelectedCategory] = useState('Trending');
+  
+  const { height: screenHeight } = Dimensions.get('window');
 
   // Fetch latest properties for recommended section
   const { data: latestProperties, loading: latestPropertiesLoading, refetch: refetchLatest } = useAppwrite({
@@ -69,7 +73,11 @@ const Home = () => {
 
 
   return (
-    <SafeAreaView className="h-full bg-background-100">
+    <SafeAreaView className="h-full">
+      <LinearGradient
+        colors={['#F0F9F4', '#E8F5E8', '#F0F9F4']}
+        style={{ flex: 1 }}
+      >
       <ScrollView 
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-32"
@@ -172,113 +180,46 @@ const Home = () => {
           </View>
         </View>
 
-        {/* Recommended Property Section */}
-        <View className="mb-6">
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="ml-5 text-xl font-rubik-bold text-black-300">Recommended Property</Text>
-            <TouchableOpacity>
-              <Text className="mr-5 text-base font-rubik-medium text-primary-300">See all</Text>
-            </TouchableOpacity>
-          </View>
-
+        {/* Properties Feed */}
+        <View className="px-5">
           {latestPropertiesLoading ? (
             <View className="items-center py-8">
               <ActivityIndicator size="large" color="#0061FF" />
               <Text className="text-sm font-rubik text-black-200 mt-2">Loading properties...</Text>
             </View>
           ) : latestProperties && latestProperties.length > 0 ? (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerClassName="ml-5 pr-5"
-            >
+            <View className="space-y-4">
               {latestProperties.map((property: any) => (
                 <TouchableOpacity 
                   key={property.$id} 
-                  className="w-80 mr-4"
+                  className="mb-4"
                   onPress={() => handleCardPress(property.$id)}
                 >
-                  <View className="relative mb-4">
-                    <Image
-                      source={createImageSource(
-                        property.images && property.images.length > 0 
-                          ? property.images[0] 
-                          : property.image, 
-                        images.newYork
-                      )}
-                      className="w-full h-48 rounded-2xl"
-                      resizeMode="cover"
-                    />
-                    <TouchableOpacity className="absolute top-3 right-3">
-                      <Ionicons 
-                        name="heart-outline" 
-                        size={24} 
-                        color="white" 
+                  <View className="bg-white rounded-3xl shadow-lg pt-2 px-2 pb-4">
+                    {/* Image Section */}
+                    <View className="relative mb-4">
+                      <Image
+                        source={createImageSource(
+                          property.images && property.images.length > 0 
+                            ? property.images[0] 
+                            : property.image, 
+                          images.newYork
+                        )}
+                        style={{ 
+                          width: '100%', 
+                          height: screenHeight * 0.35,
+                          borderRadius: 16 
+                        }}
+                        resizeMode="cover"
                       />
-                    </TouchableOpacity>
-                  </View>
-                  <Text className="text-xl font-rubik text-primary-300 ml-2">
-                    {formatPrice(property.price)}
-                  </Text>
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center flex-1 ml-2">
-                      <Ionicons name="location-outline" size={16} color="#666876" />
-                      <Text className="text-sm font-rubik text-black-200 flex-1" numberOfLines={1}>
-                        {property.address}
-                      </Text>
-                    </View>
-                    <TouchableOpacity className="bg-gray-100 w-8 h-8 rounded-full items-center justify-center">
-                      <Ionicons name="arrow-up" size={16} color="#191D31" />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ) : (
-            <View className="items-center py-8">
-              <Text className="text-base font-rubik text-black-200">No properties found</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Most Popular Section */}
-        <View className="px-5">
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-xl font-rubik-bold text-black-300">Most Popular</Text>
-            <TouchableOpacity>
-              <Text className="text-base font-rubik-medium text-primary-300">See all</Text>
-            </TouchableOpacity>
-          </View>
-
-          {popularPropertiesLoading ? (
-            <View className="items-center py-8">
-              <ActivityIndicator size="large" color="#0061FF" />
-              <Text className="text-sm font-rubik text-black-200 mt-2">Loading properties...</Text>
-            </View>
-          ) : popularProperties && popularProperties.length > 0 ? (
-            <View className="space-y-4">
-              {popularProperties.map((property: any) => (
-                <TouchableOpacity 
-                  key={property.$id} 
-                  className="flex-row items-center bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-2"
-                  onPress={() => handleCardPress(property.$id)}
-                >
-                  <Image
-                    source={createImageSource(
-                      property.images && property.images.length > 0 
-                        ? property.images[0] 
-                        : property.image, 
-                      images.newYork
-                    )}
-                    className="w-16 h-16 rounded-xl mr-4"
-                    resizeMode="cover"
-                  />
-                  <View className="flex-1">
-                    <View className="flex-row items-center justify-between mb-1">
-                      <Text className="text-base font-rubik-medium text-black-300" numberOfLines={1}>
-                        {property.name}
-                      </Text>
-                      <TouchableOpacity>
+                      {/* Property Type Badge */}
+                      <View className="absolute top-3 left-3 bg-gray-800 rounded-full px-3 py-1">
+                        <Text className="text-white text-sm font-rubik-medium">
+                          {property.type || 'Apartment'}
+                        </Text>
+                      </View>
+                      {/* Favorite Button */}
+                      <TouchableOpacity className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm">
                         <Ionicons 
                           name="heart-outline" 
                           size={20} 
@@ -286,21 +227,44 @@ const Home = () => {
                         />
                       </TouchableOpacity>
                     </View>
-                    <Text className="text-lg font-rubik-medium text-primary-300 mb-1">
-                      {formatPrice(property.price)}
-                    </Text>
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center flex-1">
-                        <Ionicons name="location-outline" size={14} color="#666876" />
-                        <Text className="text-sm font-rubik text-black-200 ml-1 flex-1" numberOfLines={1}>
-                          {property.address}
+                    
+                    {/* Details Section */}
+                    <View>
+                      {/* Title and Price */}
+                      <View className="flex-row items-center justify-between mb-2 px-2">
+                        <Text className="text-lg font-rubik-bold text-gray-900 flex-1" numberOfLines={1}>
+                          {property.name || 'Property Name'}
+                        </Text>
+                        <Text className="text-lg font-rubik-bold text-gray-900 ml-2">
+                          {formatPrice(property.price)}
                         </Text>
                       </View>
-                      <View className="flex-row items-center">
-                        <Ionicons name="star" size={14} color="#FFD700" />
-                        <Text className="text-sm font-rubik text-black-200 ml-1">
-                          {property.rating || '4.5'}
-                        </Text>
+                      
+                      {/* Address */}
+                      <Text className="text-sm text-gray-600 font-rubik mb-3 px-2" numberOfLines={2}>
+                        {property.address || 'Address not specified'}
+                      </Text>
+                      
+                      {/* Property Features */}
+                      <View className="flex-row space-x- px-2 gap-2">
+                        <View className="bg-gray-100 rounded-full px-3 py-1 flex-row items-center">
+                          <Ionicons name="bed-outline" size={14} color="#666876" />
+                          <Text className="text-sm font-rubik-medium text-gray-700 ml-1">
+                            {property.bedrooms || 0} Beds
+                          </Text>
+                        </View>
+                        <View className="bg-gray-100 rounded-full px-3 py-1 flex-row items-center">
+                          <Ionicons name="water-outline" size={14} color="#666876" />
+                          <Text className="text-sm font-rubik-medium text-gray-700 ml-1">
+                            {property.bathrooms || 0} Baths
+                          </Text>
+                        </View>
+                        <View className="bg-gray-100 rounded-full px-3 py-1 flex-row items-center">
+                          <Ionicons name="resize-outline" size={14} color="#666876" />
+                          <Text className="text-sm font-rubik-medium text-gray-700 ml-1">
+                            {property.area || 0} Sqft
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   </View>
@@ -314,6 +278,7 @@ const Home = () => {
           )}
         </View>
       </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 };
