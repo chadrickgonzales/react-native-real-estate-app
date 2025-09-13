@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
   Dimensions,
+  FlatList,
   Image,
   ScrollView,
   Text,
@@ -183,13 +184,12 @@ const Property = () => {
         </View>
 
         {/* Property Details Card */}
-        <View className="mx-4 mb-6">
+        <View className=" mb-6">
           <View className="bg-white rounded-3xl shadow-lg p-6">
-            {/* Title and Rating */}
-            <View className="flex-row items-start justify-between mb-3">
-              <View className="flex-1">
-                <Text className="text-2xl font-rubik-bold text-gray-900 mb-1">
-                  {getPropertyTypeDisplay()} {getLocationFromAddress(property.address)}
+              {/* Title and Rating */}
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-2xl font-rubik-bold text-gray-900 flex-1">
+                  Home in Dickinson
                 </Text>
                 <View className="flex-row items-center">
                   <Ionicons name="star" size={16} color="#F59E0B" />
@@ -198,7 +198,6 @@ const Property = () => {
                   </Text>
                 </View>
               </View>
-            </View>
 
             {/* Location and Price */}
             <View className="flex-row items-center justify-between mb-6">
@@ -225,55 +224,199 @@ const Property = () => {
             {/* Facilities */}
             <View className="mb-4">
               <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Facilities</Text>
-              <View className="flex-row flex-wrap">
-                <View className="w-1/3 mb-4">
-                  <View className="flex-row items-center">
-                    <Ionicons name="bed-outline" size={20} color="#6B7280" />
-                    <Text className="text-gray-600 font-rubik ml-2">
-                      {property.bedrooms || 0} Beds
-                    </Text>
+              <FlatList
+                data={[
+                  { icon: 'bed-outline', text: `${property.bedrooms || 0} Beds` },
+                  { icon: 'water-outline', text: `${property.bathrooms || 0} Baths` },
+                  { icon: 'restaurant-outline', text: `${property.kitchens || 1} Kitchen` },
+                  { icon: 'resize-outline', text: `${property.area || 0} sq ft` },
+                  { icon: 'car-outline', text: `${property.parkingSpaces || 1} Parking` },
+                  { icon: 'calendar-outline', text: 'Available Now' }
+                ]}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <View className="mr-4">
+                    <View className="flex-row items-center bg-gray-50 rounded-full px-4 py-2">
+                      <Ionicons name={item.icon as any} size={20} color="#6B7280" />
+                      <Text className="text-gray-600 font-rubik ml-2">
+                        {item.text}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                contentContainerStyle={{ paddingHorizontal: 0 }}
+              />
+            </View>
+
+            {/* Property Details - Buying */}
+            {property.propertyType === 'sell' && (
+              <View className="mb-6">
+                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Property Details</Text>
+                <View className="flex-row flex-wrap">
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Year Built</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.yearBuilt || 'N/A'}</Text>
+                  </View>
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Property Age</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.propertyAge || 'N/A'}</Text>
+                  </View>
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Lot Size</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.lotSize || 'N/A'}</Text>
+                  </View>
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Condition</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.propertyCondition || 'N/A'}</Text>
+                  </View>
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">HOA Fees</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.hoaFees ? `$${property.hoaFees}/mo` : 'N/A'}</Text>
+                  </View>
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Property Taxes</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.propertyTaxes ? `$${property.propertyTaxes}/yr` : 'N/A'}</Text>
                   </View>
                 </View>
-                <View className="w-1/3 mb-4">
-                  <View className="flex-row items-center">
-                    <Ionicons name="water-outline" size={20} color="#6B7280" />
-                    <Text className="text-gray-600 font-rubik ml-2">
-                      {property.bathrooms || 0} Baths
-                    </Text>
+              </View>
+            )}
+
+            {/* Property Details - Renting */}
+            {property.propertyType === 'rent' && (
+              <View className="mb-6">
+                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Rental Details</Text>
+                <View className="flex-row flex-wrap">
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Lease Duration</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.leaseDuration || 'N/A'}</Text>
+                  </View>
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Security Deposit</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.deposit ? `$${property.deposit}` : 'N/A'}</Text>
+                  </View>
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Pet Deposit</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.petDeposit ? `$${property.petDeposit}` : 'N/A'}</Text>
+                  </View>
+                  <View className="w-1/2 mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Available Date</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.availableDate || 'N/A'}</Text>
+                  </View>
+                  <View className="w-full mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Utilities</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.utilities || 'N/A'}</Text>
+                  </View>
+                  <View className="w-full mb-3">
+                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Move-in Requirements</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.moveInRequirements || 'N/A'}</Text>
                   </View>
                 </View>
-                <View className="w-1/3 mb-4">
-                  <View className="flex-row items-center">
-                    <Ionicons name="restaurant-outline" size={20} color="#6B7280" />
-                    <Text className="text-gray-600 font-rubik ml-2">
-                      {property.kitchens || 1} Kitchen
-                    </Text>
-                  </View>
+              </View>
+            )}
+
+            {/* Property Features */}
+            {(property.furnishedStatus || property.petFriendly || property.hasHOA || property.hasPool || property.hasGarage || property.utilitiesIncluded || property.smokingAllowed || property.backgroundCheckRequired) && (
+              <View className="mb-6">
+                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Property Features</Text>
+                <View className="flex-row flex-wrap">
+                  {property.furnishedStatus && (
+                    <View className="w-1/2 mb-3">
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full mr-2 bg-green-500" />
+                        <Text className="text-gray-900 font-rubik-medium">Furnished</Text>
+                      </View>
+                    </View>
+                  )}
+                  {property.petFriendly && (
+                    <View className="w-1/2 mb-3">
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full mr-2 bg-green-500" />
+                        <Text className="text-gray-900 font-rubik-medium">Pet Friendly</Text>
+                      </View>
+                    </View>
+                  )}
+                  {property.hasHOA && (
+                    <View className="w-1/2 mb-3">
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full mr-2 bg-green-500" />
+                        <Text className="text-gray-900 font-rubik-medium">Has HOA</Text>
+                      </View>
+                    </View>
+                  )}
+                  {property.hasPool && (
+                    <View className="w-1/2 mb-3">
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full mr-2 bg-green-500" />
+                        <Text className="text-gray-900 font-rubik-medium">Has Pool</Text>
+                      </View>
+                    </View>
+                  )}
+                  {property.hasGarage && (
+                    <View className="w-1/2 mb-3">
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full mr-2 bg-green-500" />
+                        <Text className="text-gray-900 font-rubik-medium">Has Garage</Text>
+                      </View>
+                    </View>
+                  )}
+                  {property.utilitiesIncluded && (
+                    <View className="w-1/2 mb-3">
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full mr-2 bg-green-500" />
+                        <Text className="text-gray-900 font-rubik-medium">Utilities Included</Text>
+                      </View>
+                    </View>
+                  )}
+                  {property.smokingAllowed && (
+                    <View className="w-1/2 mb-3">
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full mr-2 bg-green-500" />
+                        <Text className="text-gray-900 font-rubik-medium">Smoking Allowed</Text>
+                      </View>
+                    </View>
+                  )}
+                  {property.backgroundCheckRequired && (
+                    <View className="w-1/2 mb-3">
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full mr-2 bg-green-500" />
+                        <Text className="text-gray-900 font-rubik-medium">Background Check</Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
-                <View className="w-1/3 mb-4">
+              </View>
+            )}
+
+            {/* Amenities */}
+            {property.amenities && (
+              <View className="mb-6">
+                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Amenities</Text>
+                <Text className="text-gray-600 font-rubik leading-6">{property.amenities}</Text>
+              </View>
+            )}
+
+            {/* Contact Information */}
+            <View className="mb-6">
+              <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Contact Information</Text>
+              <View className="space-y-3">
+                {property.contactPhone && (
                   <View className="flex-row items-center">
-                    <Ionicons name="resize-outline" size={20} color="#6B7280" />
-                    <Text className="text-gray-600 font-rubik ml-2">
-                      {property.area || 0} sq ft
-                    </Text>
+                    <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center mr-3">
+                      <Ionicons name="call-outline" size={20} color="#3B82F6" />
+                    </View>
+                    <Text className="text-gray-900 font-rubik-medium">{property.contactPhone}</Text>
                   </View>
-                </View>
-                <View className="w-1/3 mb-4">
+                )}
+                {property.contactEmail && (
                   <View className="flex-row items-center">
-                    <Ionicons name="car-outline" size={20} color="#6B7280" />
-                    <Text className="text-gray-600 font-rubik ml-2">
-                      {property.parkingSpaces || 1} Parking
-                    </Text>
+                    <View className="w-10 h-10 bg-green-100 rounded-full items-center justify-center mr-3">
+                      <Ionicons name="mail-outline" size={20} color="#10B981" />
+                    </View>
+                    <Text className="text-gray-900 font-rubik-medium">{property.contactEmail}</Text>
                   </View>
-                </View>
-                <View className="w-1/3 mb-4">
-                  <View className="flex-row items-center">
-                    <Ionicons name="calendar-outline" size={20} color="#6B7280" />
-                    <Text className="text-gray-600 font-rubik ml-2">
-                      Available Now
-                    </Text>
-                  </View>
-                </View>
+                )}
               </View>
             </View>
           </View>
