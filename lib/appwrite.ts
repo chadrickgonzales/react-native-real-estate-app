@@ -313,11 +313,14 @@ export async function signUp({
 
 export async function getLatestProperties() {
   try {
+    console.log("Fetching latest properties...");
     const result = await databases.listDocuments(
       config.databaseId!,
       config.propertiesCollectionId!,
-      [Query.orderAsc("$createdAt"), Query.limit(5)]
+      [Query.orderDesc("$createdAt"), Query.limit(5)]
     );
+
+    console.log("Raw properties from database:", result.documents.length);
 
     // Parse images for each property
     const propertiesWithImages = result.documents.map(property => {
@@ -337,9 +340,10 @@ export async function getLatestProperties() {
       };
     });
 
+    console.log("Processed properties with images:", propertiesWithImages.length);
     return propertiesWithImages;
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching latest properties:", error);
     return [];
   }
 }
@@ -354,6 +358,8 @@ export async function getProperties({
   limit?: number;
 }) {
   try {
+    console.log("Fetching properties with params:", { filter, query, limit });
+    
     const buildQuery = [Query.orderDesc("$createdAt")];
 
     if (filter && filter !== "All")
@@ -376,6 +382,8 @@ export async function getProperties({
       buildQuery
     );
 
+    console.log("Raw properties from database:", result.documents.length);
+
     // Parse images for each property
     const propertiesWithImages = result.documents.map(property => {
       let parsedImages: string[] = [];
@@ -394,9 +402,10 @@ export async function getProperties({
       };
     });
 
+    console.log("Processed properties with images:", propertiesWithImages.length);
     return propertiesWithImages;
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching properties:", error);
     return [];
   }
 }

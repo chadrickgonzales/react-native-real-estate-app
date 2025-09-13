@@ -39,6 +39,10 @@ const Home = () => {
     },
   });
 
+  // Debug logging
+  console.log("Latest properties:", latestProperties?.length || 0);
+  console.log("Popular properties:", popularProperties?.length || 0);
+
   const handleCardPress = (id: string) => {
     router.push(`/properties/${id}`);
   };

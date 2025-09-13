@@ -1,5 +1,4 @@
 import icons from "@/constants/icons";
-import images from "@/constants/images";
 import { createImageSource } from "@/lib/imageUtils";
 import { Image, Text, TouchableOpacity, View } from 'react-native';
 import { Models } from "react-native-appwrite";
@@ -9,10 +8,13 @@ interface Props {
     onPress?: () => void;
 }
 
-export const FeaturedCard = ({item: {image, rating, name, address, price}, onPress}:Props) => {
+export const FeaturedCard = ({item: {image, images, rating, name, address, price}, onPress}:Props) => {
+  // Use uploaded images if available, otherwise fallback to image property
+  const displayImage = (images && images.length > 0) ? images[0] : image;
+  
   return (
     <TouchableOpacity onPress={onPress} className="flex flex-col items-start w-60 h-80 relative">
-        <Image source={createImageSource(image)} className="size-full rounded-2xl"/>
+        <Image source={createImageSource(displayImage)} className="size-full rounded-2xl"/>
         <Image source={images.cardGradient} className="size-full rounded-2xl absolute bottom-0"/>
 
         <View className="flex flex-row items-center bg-white/90 px-3 py-1.5 rounded-full absolute top-5 right-5">
@@ -38,15 +40,18 @@ export const FeaturedCard = ({item: {image, rating, name, address, price}, onPre
   )
 }
 
-export const Card = ({item: {image, rating, name, address, price}, onPress}:Props) => {
-    return (
-      <TouchableOpacity onPress={onPress} className="flex-1 w-full mt-4 px-3 py-4 rounded-lg bg-white shadow-lg shadow-black-100/70 relative">
-        <View className="flex flex-row items-center absolute px-2 top-5 right-5 bg-white/90 p-1 rounded-full z-50">
-            <Image source={icons.star} className="size-2.5"/>
-            <Text className="text-xs font-rubik-bold text-primary-300 ml-0.5">{rating}</Text>
-        </View>
+export const Card = ({item: {image, images, rating, name, address, price}, onPress}:Props) => {
+  // Use uploaded images if available, otherwise fallback to image property
+  const displayImage = (images && images.length > 0) ? images[0] : image;
+  
+  return (
+    <TouchableOpacity onPress={onPress} className="flex-1 w-full mt-4 px-3 py-4 rounded-lg bg-white shadow-lg shadow-black-100/70 relative">
+      <View className="flex flex-row items-center absolute px-2 top-5 right-5 bg-white/90 p-1 rounded-full z-50">
+          <Image source={icons.star} className="size-2.5"/>
+          <Text className="text-xs font-rubik-bold text-primary-300 ml-0.5">{rating}</Text>
+      </View>
 
-        <Image source={createImageSource(image)} className="w-full h-40 rounded-lg"/>
+      <Image source={createImageSource(displayImage)} className="w-full h-40 rounded-lg"/>
 
         <View className="flex flex-col mt-2">
             <Text className="text-base font-rubik-bold text-black-300">{name}</Text>
