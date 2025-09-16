@@ -1,14 +1,14 @@
 import * as Linking from "expo-linking";
 import { openAuthSessionAsync } from "expo-web-browser";
 import {
-  Account,
-  Avatars,
-  Client,
-  Databases,
-  ID,
-  OAuthProvider,
-  Query,
-  Storage
+    Account,
+    Avatars,
+    Client,
+    Databases,
+    ID,
+    OAuthProvider,
+    Query,
+    Storage
 } from "react-native-appwrite";
 
 export const config = {
@@ -315,7 +315,7 @@ export async function getLatestProperties(propertyType?: string, filter?: string
   try {
     console.log("Fetching latest properties with propertyType:", propertyType, "filter:", filter);
     
-    const buildQuery = [Query.orderDesc("$createdAt"), Query.limit(5)];
+    const buildQuery = [Query.orderDesc("$createdAt"), Query.limit(20)];
     
     if (propertyType && propertyType !== '') {
       buildQuery.push(Query.equal("propertyType", propertyType));

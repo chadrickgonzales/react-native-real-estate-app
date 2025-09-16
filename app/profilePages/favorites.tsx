@@ -220,7 +220,7 @@ export default function Favorites() {
 
   const filters = [
     { key: 'all', label: 'All Properties' },
-    { key: 'apartment', label: 'Apartments' },
+    { key: 'apartment', label: 'Apartment' },
     { key: 'villa', label: 'Villas' },
     { key: 'studio', label: 'Studios' }
   ]
@@ -282,7 +282,7 @@ export default function Favorites() {
             </View>
             <View className="items-center">
               <Text className="text-2xl font-rubik-bold text-blue-600">{stats.apartments}</Text>
-              <Text className="text-sm font-rubik text-black-200">Apartments</Text>
+              <Text className="text-sm font-rubik text-black-200">Apartment</Text>
             </View>
             <View className="items-center">
               <Text className="text-2xl font-rubik-bold text-green-600">{stats.villas}</Text>

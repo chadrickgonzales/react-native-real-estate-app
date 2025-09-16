@@ -3,14 +3,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -20,6 +20,7 @@ import images from "@/constants/images";
 import { getLatestProperties, getProperties } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
+import seed from "@/lib/seed";
 import { useAppwrite } from "@/lib/useAppwrite";
 
 const Home = () => {
@@ -27,6 +28,7 @@ const Home = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<'rent' | 'sell'>('sell');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isSeeding, setIsSeeding] = useState(false);
   
   const { height: screenHeight } = Dimensions.get('window');
 
@@ -34,7 +36,10 @@ const Home = () => {
   const { data: latestProperties, loading: latestPropertiesLoading, refetch: refetchLatest } = useAppwrite({
     fn: ({ propertyType, filter }: { propertyType: string; filter: string }) => 
       getLatestProperties(propertyType, filter),
-    params: { propertyType: propertyTypeFilter, filter: selectedCategory },
+    params: { 
+      propertyType: propertyTypeFilter, 
+      filter: selectedCategory 
+    },
   });
 
   // Fetch properties for most popular section (sorted by rating)
@@ -49,7 +54,7 @@ const Home = () => {
     params: {
       filter: selectedCategory,
       query: "",
-      limit: 4,
+      limit: 20,
       propertyType: propertyTypeFilter,
     },
   });
@@ -71,6 +76,31 @@ const Home = () => {
     }).format(price);
   };
 
+  const handleSeedDatabase = async () => {
+    try {
+      setIsSeeding(true);
+      console.log("Starting database seeding...");
+      await seed();
+      console.log("Database seeding completed successfully!");
+      
+      // Refetch data after seeding
+      await refetchLatest({ 
+        propertyType: propertyTypeFilter, 
+        filter: selectedCategory 
+      });
+      await refetchPopular({ 
+        filter: selectedCategory, 
+        query: "", 
+        limit: 20, 
+        propertyType: propertyTypeFilter 
+      });
+    } catch (error) {
+      console.error("Error seeding database:", error);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
 
   return (
     <SafeAreaView className="h-full">
@@ -84,7 +114,7 @@ const Home = () => {
       >
         {/* Header Section */}
         <View className="px-5 pt-5">
-          {/* User Profile and Notification */}
+          {/* User Profile and Action Buttons */}
           <View className="flex-row items-center justify-between mb-6">
             <View className="flex-row items-center">
               <Image
@@ -92,21 +122,39 @@ const Home = () => {
                 className="w-12 h-12 rounded-full"
               />
             </View>
+            
             {/* Location */}
-            <View className="items-center mb-6">
-            <Text className="text-sm font-rubik text-gray-500 mb-1">Current location</Text>
-            <View className="flex-row items-center">
-              <Ionicons name="location-outline" size={16} color="#191D31" />
-              <Text className="text-lg font-rubik-bold text-black-300 ml-1">California, USA</Text>
+            <View className="items-center">
+              <Text className="text-sm font-rubik text-gray-500 mb-1">Current location</Text>
+              <View className="flex-row items-center">
+                <Ionicons name="location-outline" size={16} color="#191D31" />
+                <Text className="text-lg font-rubik-bold text-black-300 ml-1">Tarlac City, PH</Text>
+              </View>
             </View>
-          </View>
 
-          <View className="p-2 bg-white rounded-full  shadow-md">
-            <TouchableOpacity className="relative">
-              <Ionicons name="notifications-outline" size={24} color="#191D31" />
-              <View className="absolute -top-1 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
-            </TouchableOpacity>
-          </View>
+            {/* Action Buttons */}
+            <View className="flex-row items-center gap-2">
+              {/* Seed Database Button */}
+              <TouchableOpacity 
+                className="p-2 bg-blue-500 rounded-full shadow-md"
+                onPress={handleSeedDatabase}
+                disabled={isSeeding}
+              >
+                {isSeeding ? (
+                  <ActivityIndicator size={20} color="white" />
+                ) : (
+                  <Ionicons name="refresh" size={20} color="white" />
+                )}
+              </TouchableOpacity>
+              
+              {/* Notification Button */}
+              <View className="p-2 bg-white rounded-full shadow-md">
+                <TouchableOpacity className="relative">
+                  <Ionicons name="notifications-outline" size={24} color="#191D31" />
+                  <View className="absolute -top-1 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
 
           
@@ -138,11 +186,14 @@ const Home = () => {
                 setPropertyTypeFilter(newFilter);
                 
                 // Manually refetch data with new filter and current category
-                await refetchLatest({ propertyType: newFilter, filter: selectedCategory });
+                await refetchLatest({ 
+                  propertyType: newFilter, 
+                  filter: selectedCategory 
+                });
                 await refetchPopular({ 
                   filter: selectedCategory, 
                   query: "", 
-                  limit: 4, 
+                  limit: 20, 
                   propertyType: newFilter 
                 });
               }}

@@ -4,7 +4,7 @@ import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
@@ -288,10 +288,13 @@ const Explore = () => {
   const lastLocationRef = useRef<any>(null);
   const lastLocationTimeRef = useRef<number>(0);
   const [cameraMode, setCameraMode] = useState<'free' | 'following' | 'navigation'>('free');
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const mapRef = useRef<MapView>(null);
+  const locationSubscriptionRef = useRef<any>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch all properties with coordinates
-  const { data: properties, loading: isLoading } = useAppwrite({
+  const { data: properties, loading: isLoading, refetch: refetchProperties } = useAppwrite({
     fn: () => getProperties({ 
       filter: selectedCategory, 
       query: searchQuery, 
@@ -311,7 +314,7 @@ const Explore = () => {
           return;
         }
 
-        // Get current location with high accuracy
+        // Get initial location with high accuracy
         let currentLocation = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
@@ -325,12 +328,41 @@ const Explore = () => {
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         });
+
+        // Start watching location changes
+        locationSubscriptionRef.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 1000, // Update every second
+            distanceInterval: 1, // Update every meter
+          },
+          (newLocation) => {
+            setLocation(newLocation);
+            
+            // Update map region to follow user if in following mode
+            if (cameraMode === 'following' || cameraMode === 'navigation') {
+              setMapRegion({
+                latitude: newLocation.coords.latitude,
+                longitude: newLocation.coords.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              });
+            }
+          }
+        );
       } catch (error) {
         console.error('Error getting location:', error);
         setErrorMsg('Failed to get your location. Please check your GPS settings.');
       }
     })();
-  }, []);
+
+    // Cleanup location subscription on unmount
+    return () => {
+      if (locationSubscriptionRef.current) {
+        locationSubscriptionRef.current.remove();
+      }
+    };
+  }, [cameraMode]);
 
   // Set initial map region to user's location immediately
   useEffect(() => {
@@ -344,13 +376,54 @@ const Explore = () => {
     }
   }, [location, mapRegion]);
 
-  // Filter properties that have valid coordinates
-  const propertiesWithCoords = properties?.filter((property: any) => 
-    property.latitude && 
-    property.longitude && 
-    property.latitude !== 0 && 
-    property.longitude !== 0
-  ) || [];
+  // Memoize the map region to prevent unnecessary re-renders
+  const stableMapRegion = useMemo(() => {
+    return mapRegion || {
+      latitude: location?.coords.latitude || 0,
+      longitude: location?.coords.longitude || 0,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+  }, [mapRegion, location?.coords.latitude, location?.coords.longitude]);
+
+  // Track initial load completion
+  useEffect(() => {
+    if (!isLoading && isInitialLoad) {
+      setIsInitialLoad(false);
+    }
+  }, [isLoading, isInitialLoad]);
+
+  // Debounced search effect - only for search query
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(async () => {
+      await refetchProperties({ 
+        filter: selectedCategory, 
+        query: searchQuery, 
+        limit: 100,
+        propertyType: propertyTypeFilter
+      });
+    }, 500); // 500ms delay
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]); // Only trigger on search query changes
+
+  // Filter properties that have valid coordinates - memoized to prevent unnecessary re-filtering
+  const propertiesWithCoords = useMemo(() => {
+    return properties?.filter((property: any) => 
+      property.latitude && 
+      property.longitude && 
+      property.latitude !== 0 && 
+      property.longitude !== 0
+    ) || [];
+  }, [properties]);
 
   // Handle property marker press
   const handlePropertyPress = (property: any) => {
@@ -419,6 +492,50 @@ const Explore = () => {
     }
   }, [location, showRoute, totalDistance, updateRouteProgress]);
 
+  // Add intermediate points to short routes for better turn detection
+  const addIntermediatePoints = useCallback((coordinates: any[]) => {
+    if (coordinates.length < 2) return coordinates;
+    
+    const newCoordinates = [coordinates[0]]; // Start with first point
+    
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const current = coordinates[i];
+      const next = coordinates[i + 1];
+      
+      // Add the current point
+      newCoordinates.push(current);
+      
+      // Calculate distance between points
+      const distance = calculateDistance(
+        current.latitude, current.longitude,
+        next.latitude, next.longitude
+      );
+      
+      // If distance is large, add intermediate points
+      if (distance > 0.1) { // More than 100m
+        const numPoints = Math.ceil(distance / 0.05); // Add point every 50m
+        
+        for (let j = 1; j < numPoints; j++) {
+          const ratio = j / numPoints;
+          const lat = current.latitude + (next.latitude - current.latitude) * ratio;
+          const lng = current.longitude + (next.longitude - current.longitude) * ratio;
+          
+          newCoordinates.push({ latitude: lat, longitude: lng });
+        }
+      }
+    }
+    
+    // Add the last point
+    newCoordinates.push(coordinates[coordinates.length - 1]);
+    
+    console.log('Added intermediate points:', {
+      original: coordinates.length,
+      new: newCoordinates.length
+    });
+    
+    return newCoordinates;
+  }, []);
+
   // Get route from OpenRouteService API
   const getRoute = async (startLat: number, startLon: number, endLat: number, endLon: number) => {
     try {
@@ -435,13 +552,25 @@ const Explore = () => {
       
       if (data.features && data.features[0] && data.features[0].geometry) {
         // Decode the polyline coordinates
-        const coordinates = data.features[0].geometry.coordinates.map((coord: number[]) => ({
+        let coordinates = data.features[0].geometry.coordinates.map((coord: number[]) => ({
           latitude: coord[1],
           longitude: coord[0]
         }));
         
+        // If route has too few points, add intermediate points
+        if (coordinates.length < 5) {
+          console.log('Route too short, adding intermediate points');
+          coordinates = addIntermediatePoints(coordinates);
+        }
+        
         // Get total distance from the route
         const totalDistanceKm = data.features[0].properties.summary.distance / 1000; // Convert meters to km
+        
+        console.log('Route generated:', {
+          originalPoints: data.features[0].geometry.coordinates.length,
+          finalPoints: coordinates.length,
+          totalDistance: totalDistanceKm
+        });
         
         return { coordinates, totalDistance: totalDistanceKm };
       }
@@ -619,21 +748,56 @@ const Explore = () => {
     return (bearing + 360) % 360; // Normalize to 0-360
   }, []);
 
-  // Analyze route to find upcoming turns
+  // Robust turn detection that works with short routes
   const analyzeUpcomingTurn = useCallback((currentIndex: number, routeCoords: any[]) => {
-    if (currentIndex >= routeCoords.length - 10) return null; // Near end of route
+    console.log('Route analysis:', {
+      currentIndex,
+      routeLength: routeCoords.length,
+      remainingPoints: routeCoords.length - currentIndex
+    });
     
-    const currentPoint = routeCoords[currentIndex];
-    const nextPoint = routeCoords[currentIndex + 1];
-    const futurePoint = routeCoords[Math.min(currentIndex + 5, routeCoords.length - 1)];
+    // If route is too short, use destination-based detection
+    if (routeCoords.length < 3) {
+      console.log('Route too short, using destination-based detection');
+      return null;
+    }
     
-    // Calculate current direction
+    // If near end of route, check if we need to turn to reach destination
+    if (currentIndex >= routeCoords.length - 2) {
+      console.log('Near end of route, checking destination direction');
+      return null;
+    }
+    
+    // Try to find the best points to analyze
+    let currentPoint, nextPoint, futurePoint;
+    
+    // Use current point and next available point
+    currentPoint = routeCoords[currentIndex];
+    nextPoint = routeCoords[Math.min(currentIndex + 1, routeCoords.length - 1)];
+    
+    // For future point, try to find a point further ahead, or use destination
+    if (currentIndex + 2 < routeCoords.length) {
+      futurePoint = routeCoords[currentIndex + 2];
+    } else if (routeCoords.length > 1) {
+      // Use the last point (destination) as future point
+      futurePoint = routeCoords[routeCoords.length - 1];
+    } else {
+      return null;
+    }
+    
+    if (!currentPoint || !nextPoint || !futurePoint) {
+      console.log('Missing route points');
+      return null;
+    }
+    
+    console.log('Using points:', { currentPoint, nextPoint, futurePoint });
+    
+    // Calculate bearings
     const currentBearing = calculateBearing(
       { coords: { latitude: currentPoint.latitude, longitude: currentPoint.longitude } },
       { coords: { latitude: nextPoint.latitude, longitude: nextPoint.longitude } }
     );
     
-    // Calculate future direction
     const futureBearing = calculateBearing(
       { coords: { latitude: nextPoint.latitude, longitude: nextPoint.longitude } },
       { coords: { latitude: futurePoint.latitude, longitude: futurePoint.longitude } }
@@ -644,27 +808,35 @@ const Explore = () => {
     if (turnAngle > 180) turnAngle -= 360;
     if (turnAngle < -180) turnAngle += 360;
     
-    // Determine turn type based on angle
     const absAngle = Math.abs(turnAngle);
     
-    if (absAngle < 15) {
-      return null; // No significant turn
-    } else if (absAngle < 45) {
-      return turnAngle > 0 ? 'Slight right' : 'Slight left';
-    } else if (absAngle < 135) {
-      return turnAngle > 0 ? 'Turn right' : 'Turn left';
-    } else if (absAngle < 180) {
-      return turnAngle > 0 ? 'Sharp right' : 'Sharp left';
-    } else {
-      return 'U-turn';
+    // Debug logging
+    console.log('Turn Analysis:', {
+      currentBearing,
+      futureBearing,
+      turnAngle,
+      absAngle,
+      currentIndex,
+      routeLength: routeCoords.length
+    });
+    
+    // Detect turns with lower threshold for better sensitivity
+    if (absAngle >= 8) { // Even more sensitive
+      const turnDirection = turnAngle > 0 ? 'Turn right' : 'Turn left';
+      console.log('Turn detected:', turnDirection, 'Angle:', absAngle);
+      return turnDirection;
     }
+    
+    console.log('No turn detected, going straight. Angle:', absAngle);
+    return null; // Going straight
   }, [calculateBearing]);
 
-  // Get distance to next turn
+  // Simple distance calculation to next turn
   const getDistanceToNextTurn = useCallback((currentIndex: number, routeCoords: any[]) => {
     if (currentIndex >= routeCoords.length - 1) return 0;
     
     let distance = 0;
+    // Look ahead up to 10 points to find next turn
     for (let i = currentIndex; i < Math.min(currentIndex + 10, routeCoords.length - 1); i++) {
       const current = routeCoords[i];
       const next = routeCoords[i + 1];
@@ -737,18 +909,49 @@ const Explore = () => {
       const upcomingTurn = analyzeUpcomingTurn(closestIndex, routeCoordinates);
       const distanceToTurn = getDistanceToNextTurn(closestIndex, routeCoordinates);
       
+      // Debug logging to identify the issue
+      console.log('Turn Detection Debug:', {
+        closestIndex,
+        routeLength: routeCoordinates.length,
+        upcomingTurn,
+        distanceToTurn,
+        currentLocation: location.coords,
+        routeCoords: routeCoordinates.slice(closestIndex, closestIndex + 5)
+      });
+      
       // Update current instruction based on whether there's an upcoming turn
       if (!upcomingTurn) {
-        // No significant turn coming up - just continue straight
-        setCurrentInstruction('Continue straight');
+        // No turn detected - check if we need a fallback based on distance to destination
+        if (distanceToTurn < 0.05) { // Less than 50m to destination
+          setCurrentInstruction('Arriving at destination');
+        } else if (distanceToTurn < 0.15) { // Less than 150m - likely a turn coming
+          // Fallback: If close and no turn detected, check direction to destination
+          if (location && destinationProperty) {
+            const directDistance = calculateDistance(
+              location.coords.latitude,
+              location.coords.longitude,
+              destinationProperty.latitude,
+              destinationProperty.longitude
+            );
+            
+            // If direct distance is much less than route distance, there's likely a turn
+            if (directDistance < distanceToTurn * 0.7) {
+              setCurrentInstruction('Turn ahead');
+            } else {
+              setCurrentInstruction('Continue straight');
+            }
+          } else {
+            setCurrentInstruction('Turn ahead');
+          }
+        } else {
+          setCurrentInstruction('Continue straight');
+        }
       } else {
         // There is a turn coming up - show distance-based instructions
-        if (distanceToTurn > 0.5) { // More than 500m to turn
+        if (distanceToTurn > 0.2) { // More than 200m to turn
           setCurrentInstruction('Continue straight');
-        } else if (distanceToTurn > 0.2) { // 200-500m to turn
-          setCurrentInstruction('Prepare to turn');
         } else if (distanceToTurn > 0.1) { // 100-200m to turn
-          setCurrentInstruction('Turn ahead');
+          setCurrentInstruction(`${upcomingTurn} ahead`);
         } else { // Less than 100m to turn
           setCurrentInstruction(upcomingTurn);
         }
@@ -845,12 +1048,27 @@ const Explore = () => {
     }
   }, [showRoute, updateNavigationInstructions]);
 
+  // Update navigation instructions when location changes (more responsive)
+  useEffect(() => {
+    if (showRoute && location) {
+      updateNavigationInstructions();
+    }
+  }, [location, showRoute, updateNavigationInstructions]);
+
   // Check for arrival when location changes
   useEffect(() => {
     if (showRoute && !showArrivalPrompt) {
       checkArrival();
     }
   }, [showRoute, showArrivalPrompt, checkArrival]);
+
+  // Update camera when location changes during navigation
+  useEffect(() => {
+    if (location && showRoute && cameraMode === 'navigation' && mapRef.current) {
+      // Animate camera to follow user with rotation
+      animateToNavigationView(location);
+    }
+  }, [location, showRoute, cameraMode, animateToNavigationView]);
 
   if (errorMsg) {
     Alert.alert('Error', errorMsg);
@@ -873,7 +1091,12 @@ const Explore = () => {
                   onChangeText={setSearchQuery}
                 />
               </View>
-              <TouchableOpacity className="bg-primary-300 w-16 h-16 rounded-full items-center justify-center mr-2">
+              <TouchableOpacity 
+                className="bg-primary-300 w-16 h-16 rounded-full items-center justify-center mr-2"
+                onPress={() => {
+                  // Search is handled automatically by debounced effect
+                }}
+              >
                 <Ionicons name="search" size={20} color="white" />
               </TouchableOpacity>
             </View>
@@ -881,7 +1104,17 @@ const Explore = () => {
             {/* Rent/Buy Filter */}
             <TouchableOpacity
               className="bg-white w-16 h-16 mb-6 rounded-full items-center justify-center shadow-lg"
-              onPress={() => setPropertyTypeFilter(propertyTypeFilter === 'sell' ? 'rent' : 'sell')}
+              onPress={async () => {
+                const newFilter = propertyTypeFilter === 'sell' ? 'rent' : 'sell';
+                setPropertyTypeFilter(newFilter);
+                // Refetch properties with new filter
+                await refetchProperties({ 
+                  filter: selectedCategory, 
+                  query: searchQuery, 
+                  limit: 100,
+                  propertyType: newFilter
+                });
+              }}
               activeOpacity={1}
             >
               <Ionicons 
@@ -897,14 +1130,23 @@ const Explore = () => {
             <View className="bg-white px-2 py-2 rounded-full shadow-lg">
               <Filters 
                 propertyType={propertyTypeFilter}
-                onCategoryChange={setSelectedCategory}
+                onCategoryChange={async (category) => {
+                  setSelectedCategory(category);
+                  // Refetch properties with new category filter
+                  await refetchProperties({ 
+                    filter: category, 
+                    query: searchQuery, 
+                    limit: 100,
+                    propertyType: propertyTypeFilter
+                  });
+                }}
               />
             </View>
           </View>
         </>
       )}
 
-      {isLoading || !location ? (
+      {isInitialLoad || !location ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0061FF" />
           <Text style={styles.loadingText}>
@@ -913,19 +1155,15 @@ const Explore = () => {
         </View>
       ) : (
         <MapView
+          key="explore-map" // Stable key to prevent re-mounting
           ref={mapRef}
           style={styles.map}
-          region={mapRegion || {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-          showsUserLocation={false}
+          region={stableMapRegion}
+          showsUserLocation={true}
           showsMyLocationButton={false}
           mapType="standard"
           customMapStyle={mapStyle}
-          followsUserLocation={cameraMode === 'navigation'}
+          followsUserLocation={cameraMode === 'navigation' || cameraMode === 'following'}
           userLocationPriority="high"
           userLocationUpdateInterval={1000}
           userLocationFastestInterval={500}
@@ -938,7 +1176,7 @@ const Explore = () => {
           {/* Property markers from database */}
           {propertiesWithCoords.map((property, index) => (
             <PropertyMarker
-              key={property.$id || index}
+              key={`property-${property.$id || index}`}
               property={property}
               onPress={() => handlePropertyPress(property)}
             />
@@ -962,6 +1200,7 @@ const Explore = () => {
         style={styles.gradientOverlay}
         pointerEvents="none"
       />
+
 
       {/* Navigation UI - Top Bar */}
       {showRoute && (
@@ -1055,7 +1294,7 @@ const Explore = () => {
               if (location) {
                 if (cameraMode === 'navigation') {
                   // In navigation mode, use 3D camera view
-                  animateToNavigationView(location, 0, 1000);
+                  animateToNavigationView(location);
                 } else {
                   // In free mode, use standard view
                   animateToLocation(location, 0.01, 1000);
@@ -1720,5 +1959,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
 
 export default Explore;

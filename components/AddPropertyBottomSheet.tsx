@@ -209,6 +209,7 @@ const AddPropertyBottomSheet = ({
     } else if (step === 2) {
       if (!propertyData.title.trim()) newErrors.title = "Title is required";
       if (!propertyData.address.trim()) newErrors.address = "Address is required";
+      if (!propertyData.type.trim()) newErrors.type = "Property type is required";
       if (!propertyData.bedrooms.trim()) newErrors.bedrooms = "Bedrooms is required";
       if (!propertyData.bathrooms.trim()) newErrors.bathrooms = "Bathrooms is required";
       if (!propertyData.price.trim()) newErrors.price = "Price is required";
@@ -216,7 +217,6 @@ const AddPropertyBottomSheet = ({
       if (!propertyData.availableDate?.trim()) newErrors.availableDate = "Available date is required";
       if (!propertyData.contactPhone?.trim()) newErrors.contactPhone = "Contact phone is required";
       if (!propertyData.contactEmail?.trim()) newErrors.contactEmail = "Contact email is required";
-      // Property type is now optional
     } else if (step === 5) {
       if (!propertyData.latitude || !propertyData.longitude) {
         newErrors.latitude = "Please pin your property location on the map" as any;
