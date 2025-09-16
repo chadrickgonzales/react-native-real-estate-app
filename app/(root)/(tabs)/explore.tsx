@@ -4,7 +4,7 @@ import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
@@ -278,6 +278,17 @@ const Explore = () => {
   const [totalDistance, setTotalDistance] = useState(0);
   const [routeProgress, setRouteProgress] = useState(0);
   const [destinationProperty, setDestinationProperty] = useState<any>(null);
+  const [currentInstruction, setCurrentInstruction] = useState('Continue straight');
+  const [nextInstruction, setNextInstruction] = useState('');
+  const [showNextInstruction, setShowNextInstruction] = useState(false);
+  const [eta, setEta] = useState('1 hr 13 min');
+  const [arrivalTime, setArrivalTime] = useState('10:28 AM');
+  const [showArrivalPrompt, setShowArrivalPrompt] = useState(false);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
+  const lastLocationRef = useRef<any>(null);
+  const lastLocationTimeRef = useRef<number>(0);
+  const [cameraMode, setCameraMode] = useState<'free' | 'following' | 'navigation'>('free');
+  const mapRef = useRef<MapView>(null);
 
   // Fetch all properties with coordinates
   const { data: properties, loading: isLoading } = useAppwrite({
@@ -293,22 +304,31 @@ const Explore = () => {
 
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setErrorMsg('Permission to access location was denied');
-        return;
-      }
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setErrorMsg('Permission to access location was denied');
+          return;
+        }
 
-      let currentLocation = await Location.getCurrentPositionAsync({});
-      setLocation(currentLocation);
-      
-      // Set map region to center on user's location
-      setMapRegion({
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
+        // Get current location with high accuracy
+        let currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        
+        setLocation(currentLocation);
+        
+        // Set map region to center on user's location immediately
+        setMapRegion({
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      } catch (error) {
+        console.error('Error getting location:', error);
+        setErrorMsg('Failed to get your location. Please check your GPS settings.');
+      }
     })();
   }, []);
 
@@ -348,6 +368,16 @@ const Explore = () => {
     setTotalDistance(0);
     setRouteProgress(0);
     setDestinationProperty(null);
+    setCurrentSpeed(0);
+    lastLocationRef.current = null;
+    lastLocationTimeRef.current = 0;
+    setCurrentInstruction('Continue straight');
+    setNextInstruction('');
+    setShowNextInstruction(false);
+    setEta('1 hr 13 min');
+    setArrivalTime('10:28 AM');
+    setCameraMode('free');
+    setShowArrivalPrompt(false);
   };
 
   // Update route progress based on current location
@@ -453,6 +483,9 @@ const Explore = () => {
         setShowRoute(true);
         setIsCalculatingRoute(false);
         
+        // Enable navigation camera mode
+        setCameraMode('navigation');
+        
         // Close the modal
         setShowPropertyModal(false);
         setSelectedProperty(null);
@@ -505,77 +538,397 @@ const Explore = () => {
     return distance;
   };
 
+  // Calculate speed in km/h
+  const calculateSpeed = (distance: number, timeDiff: number) => {
+    if (timeDiff === 0) return 0;
+    const speedKmh = (distance / timeDiff) * 3600; // Convert to km/h
+    return Math.max(0, Math.min(speedKmh, 200)); // Cap between 0-200 km/h
+  };
+
+  // Format time duration
+  const formatDuration = (hours: number) => {
+    if (hours < 1/60) { // Less than 1 minute
+      const seconds = Math.round(hours * 3600);
+      return `${seconds} sec`;
+    } else if (hours < 1) { // Less than 1 hour
+      const minutes = Math.round(hours * 60);
+      return minutes > 0 ? `${minutes} min` : '1 min';
+    } else {
+      const wholeHours = Math.floor(hours);
+      const minutes = Math.round((hours - wholeHours) * 60);
+      return minutes > 0 ? `${wholeHours} hr ${minutes} min` : `${wholeHours} hr`;
+    }
+  };
+
+  // Format arrival time
+  const formatArrivalTime = (hoursFromNow: number) => {
+    const now = new Date();
+    const arrival = new Date(now.getTime() + (hoursFromNow * 60 * 60 * 1000));
+    return arrival.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  // Update speed based on location changes
+  const updateSpeed = useCallback(() => {
+    if (location && lastLocationRef.current && lastLocationTimeRef.current > 0) {
+      const currentTime = Date.now();
+      const timeDiff = (currentTime - lastLocationTimeRef.current) / 1000; // seconds
+      
+      if (timeDiff > 0) {
+        const distance = calculateDistance(
+          lastLocationRef.current.coords.latitude,
+          lastLocationRef.current.coords.longitude,
+          location.coords.latitude,
+          location.coords.longitude
+        );
+        
+        const speed = calculateSpeed(distance, timeDiff);
+        setCurrentSpeed(speed);
+      }
+    }
+  }, [location]);
+
+  // Update ETA and arrival time
+  const updateETA = useCallback(() => {
+    if (remainingDistance > 0 && currentSpeed > 0) {
+      const hoursToDestination = remainingDistance / currentSpeed;
+      setEta(formatDuration(hoursToDestination));
+      setArrivalTime(formatArrivalTime(hoursToDestination));
+    } else if (remainingDistance > 0) {
+      // Fallback: assume average speed of 30 km/h in city
+      const hoursToDestination = remainingDistance / 30;
+      setEta(formatDuration(hoursToDestination));
+      setArrivalTime(formatArrivalTime(hoursToDestination));
+    }
+  }, [remainingDistance, currentSpeed]);
+
+  const calculateBearing = useCallback((from: any, to: any) => {
+    if (!from || !to) return 0;
+    
+    const lat1 = from.coords.latitude * Math.PI / 180;
+    const lat2 = to.coords.latitude * Math.PI / 180;
+    const deltaLon = (to.coords.longitude - from.coords.longitude) * Math.PI / 180;
+    
+    const y = Math.sin(deltaLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+    
+    let bearing = Math.atan2(y, x) * 180 / Math.PI;
+    return (bearing + 360) % 360; // Normalize to 0-360
+  }, []);
+
+  // Analyze route to find upcoming turns
+  const analyzeUpcomingTurn = useCallback((currentIndex: number, routeCoords: any[]) => {
+    if (currentIndex >= routeCoords.length - 10) return null; // Near end of route
+    
+    const currentPoint = routeCoords[currentIndex];
+    const nextPoint = routeCoords[currentIndex + 1];
+    const futurePoint = routeCoords[Math.min(currentIndex + 5, routeCoords.length - 1)];
+    
+    // Calculate current direction
+    const currentBearing = calculateBearing(
+      { coords: { latitude: currentPoint.latitude, longitude: currentPoint.longitude } },
+      { coords: { latitude: nextPoint.latitude, longitude: nextPoint.longitude } }
+    );
+    
+    // Calculate future direction
+    const futureBearing = calculateBearing(
+      { coords: { latitude: nextPoint.latitude, longitude: nextPoint.longitude } },
+      { coords: { latitude: futurePoint.latitude, longitude: futurePoint.longitude } }
+    );
+    
+    // Calculate turn angle
+    let turnAngle = futureBearing - currentBearing;
+    if (turnAngle > 180) turnAngle -= 360;
+    if (turnAngle < -180) turnAngle += 360;
+    
+    // Determine turn type based on angle
+    const absAngle = Math.abs(turnAngle);
+    
+    if (absAngle < 15) {
+      return null; // No significant turn
+    } else if (absAngle < 45) {
+      return turnAngle > 0 ? 'Slight right' : 'Slight left';
+    } else if (absAngle < 135) {
+      return turnAngle > 0 ? 'Turn right' : 'Turn left';
+    } else if (absAngle < 180) {
+      return turnAngle > 0 ? 'Sharp right' : 'Sharp left';
+    } else {
+      return 'U-turn';
+    }
+  }, [calculateBearing]);
+
+  // Get distance to next turn
+  const getDistanceToNextTurn = useCallback((currentIndex: number, routeCoords: any[]) => {
+    if (currentIndex >= routeCoords.length - 1) return 0;
+    
+    let distance = 0;
+    for (let i = currentIndex; i < Math.min(currentIndex + 10, routeCoords.length - 1); i++) {
+      const current = routeCoords[i];
+      const next = routeCoords[i + 1];
+      distance += calculateDistance(current.latitude, current.longitude, next.latitude, next.longitude);
+    }
+    return distance;
+  }, []);
+
+  // Check if user has arrived at destination
+  const checkArrival = useCallback(() => {
+    if (location && destinationProperty && showRoute) {
+      const distanceToDestination = calculateDistance(
+        location.coords.latitude,
+        location.coords.longitude,
+        destinationProperty.latitude,
+        destinationProperty.longitude
+      );
+      
+      // Consider arrived if within 50 meters of destination
+      if (distanceToDestination <= 0.05 && !showArrivalPrompt) {
+        setShowArrivalPrompt(true);
+        setCurrentInstruction('You have arrived!');
+        setNextInstruction('');
+        setShowNextInstruction(false);
+      }
+    }
+  }, [location, destinationProperty, showRoute, showArrivalPrompt]);
+
+  // Handle arrival confirmation
+  const handleArrivalConfirmation = useCallback(() => {
+    setShowArrivalPrompt(false);
+    setShowRoute(false);
+    setRouteCoordinates([]);
+    setRemainingDistance(0);
+    setTotalDistance(0);
+    setRouteProgress(0);
+    setDestinationProperty(null);
+    setCurrentSpeed(0);
+    lastLocationRef.current = null;
+    lastLocationTimeRef.current = 0;
+    setCurrentInstruction('Continue straight');
+    setNextInstruction('');
+    setShowNextInstruction(false);
+    setEta('1 hr 13 min');
+    setArrivalTime('10:28 AM');
+    setCameraMode('free');
+  }, []);
+
+  // Update navigation instructions based on route progress
+  const updateNavigationInstructions = useCallback(() => {
+    if (routeCoordinates.length > 0 && location) {
+      // Find the closest point on the route to current location
+      let closestIndex = 0;
+      let minDistance = Infinity;
+      
+      routeCoordinates.forEach((point, index) => {
+        const distance = calculateDistance(
+          location.coords.latitude,
+          location.coords.longitude,
+          point.latitude,
+          point.longitude
+        );
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = index;
+        }
+      });
+      
+      // Analyze upcoming turn
+      const upcomingTurn = analyzeUpcomingTurn(closestIndex, routeCoordinates);
+      const distanceToTurn = getDistanceToNextTurn(closestIndex, routeCoordinates);
+      
+      // Update current instruction based on whether there's an upcoming turn
+      if (!upcomingTurn) {
+        // No significant turn coming up - just continue straight
+        setCurrentInstruction('Continue straight');
+      } else {
+        // There is a turn coming up - show distance-based instructions
+        if (distanceToTurn > 0.5) { // More than 500m to turn
+          setCurrentInstruction('Continue straight');
+        } else if (distanceToTurn > 0.2) { // 200-500m to turn
+          setCurrentInstruction('Prepare to turn');
+        } else if (distanceToTurn > 0.1) { // 100-200m to turn
+          setCurrentInstruction('Turn ahead');
+        } else { // Less than 100m to turn
+          setCurrentInstruction(upcomingTurn);
+        }
+      }
+      
+      // Update next instruction - only show if there's a significant turn coming
+      if (upcomingTurn && distanceToTurn > 0.1) {
+        // Format distance for display
+        let distanceText = '';
+        if (distanceToTurn >= 1) {
+          distanceText = `${distanceToTurn.toFixed(1)} km`;
+        } else {
+          distanceText = `${Math.round(distanceToTurn * 1000)} m`;
+        }
+        
+        setNextInstruction(`${upcomingTurn} in ${distanceText}`);
+        setShowNextInstruction(true);
+      } else {
+        setNextInstruction('');
+        setShowNextInstruction(false);
+      }
+      
+      // Check if near destination
+      const progressPercent = (closestIndex / routeCoordinates.length) * 100;
+      if (progressPercent > 95) {
+        setCurrentInstruction('Arriving at destination');
+        setNextInstruction('');
+        setShowNextInstruction(false);
+      }
+    }
+  }, [routeCoordinates, location, analyzeUpcomingTurn, getDistanceToNextTurn]);
+
+  // Camera control functions
+  const animateToLocation = useCallback((location: any, zoomLevel: number = 0.01, duration: number = 1000) => {
+    if (mapRef.current && location) {
+      mapRef.current.animateToRegion({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: zoomLevel,
+        longitudeDelta: zoomLevel,
+      }, duration);
+    }
+  }, []);
+
+  const animateToNavigationView = useCallback((location: any, bearing: number = 0, duration: number = 1000) => {
+    if (mapRef.current && location) {
+      mapRef.current.animateCamera({
+        center: {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        },
+        pitch: 45, // Tilt the camera for 3D effect
+        heading: bearing, // Rotate camera based on movement direction
+        altitude: 1000, // Height above ground
+      }, { duration });
+    }
+  }, []);
+
+  // Track location changes for speed calculation and camera movement
+  useEffect(() => {
+    if (location && showRoute) {
+      const currentTime = Date.now();
+      
+      if (lastLocationRef.current && lastLocationTimeRef.current > 0) {
+        updateSpeed();
+        
+        // Calculate bearing for camera rotation
+        const bearing = calculateBearing(lastLocationRef.current, location);
+        
+        // Animate camera to follow user with rotation
+        animateToNavigationView(location, bearing, 500);
+      } else {
+        // First location update - zoom in for navigation
+        animateToLocation(location, 0.005, 1000);
+        setCameraMode('navigation');
+      }
+      
+      lastLocationRef.current = location;
+      lastLocationTimeRef.current = currentTime;
+    }
+  }, [location, showRoute, updateSpeed, calculateBearing, animateToNavigationView, animateToLocation]);
+
+  // Update ETA when speed or distance changes
+  useEffect(() => {
+    if (showRoute) {
+      updateETA();
+    }
+  }, [showRoute, updateETA]);
+
+  // Update navigation instructions when route or location changes
+  useEffect(() => {
+    if (showRoute) {
+      updateNavigationInstructions();
+    }
+  }, [showRoute, updateNavigationInstructions]);
+
+  // Check for arrival when location changes
+  useEffect(() => {
+    if (showRoute && !showArrivalPrompt) {
+      checkArrival();
+    }
+  }, [showRoute, showArrivalPrompt, checkArrival]);
+
   if (errorMsg) {
     Alert.alert('Error', errorMsg);
   }
 
   return (
     <View style={styles.container}>
-      {/* Search Bar and Filter */}
-      <View className="absolute top-12 left-5 right-5 z-50 flex-row items-center gap-2 mt-2">
-        {/* Search Bar */}
-        <View className="flex-1 flex-row items-center mb-6 bg-white rounded-full shadow-lg">
-          <View className="flex-1 bg-white rounded-full px-3 py-3 mr-1">
-            <TextInput
-              className="text-base font-rubik text-black-300"
-              placeholder="Find something new"
-              placeholderTextColor="#8c8e98"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+      {/* Search Bar and Filter - Hidden during navigation */}
+      {!showRoute && (
+        <>
+          <View className="absolute top-12 left-5 right-5 z-50 flex-row items-center gap-2 mt-2">
+            {/* Search Bar */}
+            <View className="flex-1 flex-row items-center mb-6 bg-white rounded-full shadow-lg">
+              <View className="flex-1 bg-white rounded-full px-3 py-3 mr-1">
+                <TextInput
+                  className="text-base font-rubik text-black-300"
+                  placeholder="Find something new"
+                  placeholderTextColor="#8c8e98"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+              <TouchableOpacity className="bg-primary-300 w-16 h-16 rounded-full items-center justify-center mr-2">
+                <Ionicons name="search" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Rent/Buy Filter */}
+            <TouchableOpacity
+              className="bg-white w-16 h-16 mb-6 rounded-full items-center justify-center shadow-lg"
+              onPress={() => setPropertyTypeFilter(propertyTypeFilter === 'sell' ? 'rent' : 'sell')}
+              activeOpacity={1}
+            >
+              <Ionicons 
+                name={propertyTypeFilter === 'sell' ? 'home-outline' : 'key-outline'} 
+                size={24} 
+                color="#666" 
+              />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity className="bg-primary-300 w-16 h-16 rounded-full items-center justify-center mr-2">
-            <Ionicons name="search" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
 
-        {/* Rent/Buy Filter */}
-        <TouchableOpacity
-          className="bg-white w-16 h-16 mb-6 rounded-full items-center justify-center shadow-lg"
-          onPress={() => setPropertyTypeFilter(propertyTypeFilter === 'sell' ? 'rent' : 'sell')}
-          activeOpacity={1}
-        >
-          <Ionicons 
-            name={propertyTypeFilter === 'sell' ? 'home-outline' : 'key-outline'} 
-            size={24} 
-            color="#666" 
-          />
-        </TouchableOpacity>
-      </View>
+          {/* Category Filters */}
+          <View className="absolute top-32 left-5 right-5 z-40 mt-6">
+            <View className="bg-white px-2 py-2 rounded-full shadow-lg">
+              <Filters 
+                propertyType={propertyTypeFilter}
+                onCategoryChange={setSelectedCategory}
+              />
+            </View>
+          </View>
+        </>
+      )}
 
-      {/* Category Filters */}
-      <View className="absolute top-32 left-5 right-5 z-40 mt-6">
-        <View className="bg-white px-2 py-2 rounded-full shadow-lg">
-          <Filters 
-            propertyType={propertyTypeFilter}
-            onCategoryChange={setSelectedCategory}
-          />
-        </View>
-      </View>
-
-      {isLoading ? (
+      {isLoading || !location ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0061FF" />
-          <Text style={styles.loadingText}>Loading properties...</Text>
+          <Text style={styles.loadingText}>
+            {!location ? 'Getting your location...' : 'Loading properties...'}
+          </Text>
         </View>
       ) : (
         <MapView
+          ref={mapRef}
           style={styles.map}
-          region={mapRegion || (location ? {
+          region={mapRegion || {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
-          } : {
-            latitude: 37.78825,
-            longitude: -122.4324,
-            latitudeDelta: 0.0922,
-            longitudeDelta: 0.0421,
-          })}
+          }}
           showsUserLocation={false}
           showsMyLocationButton={false}
           mapType="standard"
           customMapStyle={mapStyle}
+          followsUserLocation={cameraMode === 'navigation'}
+          userLocationPriority="high"
+          userLocationUpdateInterval={1000}
+          userLocationFastestInterval={500}
         >
           {/* User's current location marker */}
           {location && (
@@ -610,34 +963,129 @@ const Explore = () => {
         pointerEvents="none"
       />
 
-      {/* Route Progress FAB */}
+      {/* Navigation UI - Top Bar */}
       {showRoute && (
-        <View style={styles.fabContainer}>
-          {/* Progress Ring */}
-          <View style={styles.progressRing}>
-            <View style={[styles.progressFill, { 
-              transform: [{ rotate: `${(routeProgress / 100) * 360}deg` }] 
-            }]} />
+        <View style={styles.navigationTopBar}>
+          {/* Main Navigation Instruction */}
+          <View style={styles.mainInstruction}>
+            <View style={styles.instructionContent}>
+              <Ionicons name="arrow-up" size={20} color="white" />
+              <Text style={styles.instructionText}>{currentInstruction}</Text>
+            </View>
+            <TouchableOpacity style={styles.voiceButton}>
+              <View style={styles.voiceIcon}>
+                <View style={styles.voiceMic} />
+              </View>
+            </TouchableOpacity>
           </View>
           
-          {/* FAB Button */}
+          {/* Next Instruction - Only show when there's an upcoming turn */}
+          {showNextInstruction && nextInstruction && (
+            <View style={styles.nextInstruction}>
+              <Text style={styles.nextInstructionText}>{nextInstruction}</Text>
+              <Ionicons name="arrow-forward" size={16} color="white" />
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Navigation UI - Bottom Summary Bar */}
+      {showRoute && (
+        <View style={styles.navigationBottomBar}>
           <TouchableOpacity 
-            style={styles.fab}
+            style={styles.closeButton}
             onPress={() => {
-              // Show the destination property modal
-              if (destinationProperty) {
-                setSelectedProperty(destinationProperty);
-                setShowPropertyModal(true);
+              setShowRoute(false);
+              setRouteCoordinates([]);
+              setRemainingDistance(0);
+              setTotalDistance(0);
+              setRouteProgress(0);
+              setDestinationProperty(null);
+              setCurrentSpeed(0);
+              lastLocationRef.current = null;
+              lastLocationTimeRef.current = 0;
+              setCurrentInstruction('Continue straight');
+              setNextInstruction('');
+              setShowNextInstruction(false);
+              setEta('1 hr 13 min');
+              setArrivalTime('10:28 AM');
+              setCameraMode('free');
+              setShowArrivalPrompt(false);
+            }}
+          >
+            <Ionicons name="close" size={20} color="black" />
+          </TouchableOpacity>
+          
+          <View style={styles.routeInfo}>
+            <View style={styles.etaContainer}>
+              <Text style={styles.etaText}>{eta}</Text>
+              <TouchableOpacity style={styles.infoButton}>
+                <Ionicons name="information-circle" size={16} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.routeDetails}>
+              <Text style={styles.distanceText}>{remainingDistance.toFixed(1)} km</Text>
+              <Text style={styles.arrivalText}>{arrivalTime}</Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity style={styles.routeOptionsButton}>
+            <Ionicons name="swap-horizontal" size={20} color="black" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+
+      {/* Navigation UI - Speed Indicator */}
+      {showRoute && (
+        <View style={styles.speedIndicatorContainer}>
+          <View style={styles.speedIndicator}>
+            <Text style={styles.speedText}>{Math.round(currentSpeed)} km/h</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Navigation UI - Recenter FAB */}
+      {showRoute && (
+        <View style={styles.recenterFabContainer}>
+          <TouchableOpacity 
+            style={styles.recenterFab}
+            onPress={() => {
+              // Recenter map to user's location
+              if (location) {
+                if (cameraMode === 'navigation') {
+                  // In navigation mode, use 3D camera view
+                  animateToNavigationView(location, 0, 1000);
+                } else {
+                  // In free mode, use standard view
+                  animateToLocation(location, 0.01, 1000);
+                }
               }
             }}
           >
-            <Ionicons name="navigate" size={24} color="white" />
+            <Ionicons name="locate" size={20} color="#666" />
           </TouchableOpacity>
-          
-          {/* Distance Text */}
-          <Text style={styles.distanceText}>
-            {remainingDistance.toFixed(1)} km
-          </Text>
+        </View>
+      )}
+
+      {/* Arrival Prompt Modal */}
+      {showArrivalPrompt && (
+        <View style={styles.arrivalPromptOverlay}>
+          <View style={styles.arrivalPrompt}>
+            <View style={styles.arrivalIcon}>
+              <Ionicons name="checkmark-circle" size={60} color="#10B981" />
+            </View>
+            <Text style={styles.arrivalTitle}>You have arrived!</Text>
+            <Text style={styles.arrivalSubtitle}>
+              You have reached your destination
+            </Text>
+            <TouchableOpacity 
+              style={styles.arrivalConfirmButton}
+              onPress={handleArrivalConfirmation}
+            >
+              <Text style={styles.arrivalConfirmText}>End Navigation</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -844,25 +1292,26 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  // Property Modal Styles - Matching Home Page Card Design
+  // Property Modal Styles - Navigation Style
   modalOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 100,
     zIndex: 1000,
     justifyContent: 'flex-end',
-    paddingBottom: 100, // Above navigation bar
-    paddingHorizontal: 20,
+    paddingBottom: 0,
+    paddingHorizontal: 0,
   },
   propertyModal: {
     backgroundColor: 'white',
-    borderRadius: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: -4,
     },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -871,6 +1320,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 8,
     paddingBottom: 16,
+    maxHeight: '80%',
   },
   propertyImageContainer: {
     position: 'relative',
@@ -1007,59 +1457,267 @@ const styles = StyleSheet.create({
     height: 200,
     zIndex: 1,
   },
-  // FAB and Progress Ring Styles
-  fabContainer: {
+  // Navigation UI Styles
+  navigationTopBar: {
     position: 'absolute',
-    bottom: 100,
-    right: 20,
+    top: 50,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    paddingHorizontal: 16,
+
+  },
+  mainInstruction: {
+    backgroundColor: '#1F8A3A',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  instructionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instructionText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  voiceButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voiceIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voiceMic: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'white',
+  },
+  nextInstruction: {
+    backgroundColor: '#2A9D4A',
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '30%',
+  },
+  nextInstructionText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  navigationBottomBar: {
+    position: 'absolute',
+    bottom: 70,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
     zIndex: 1000,
   },
-  progressRing: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: 'rgba(0, 97, 255, 0.3)',
-    position: 'absolute',
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  routeInfo: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 16,
+  },
+  etaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  etaText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F8A3A',
+    marginRight: 8,
+  },
+  infoButton: {
+    width: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  progressFill: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: '#0061FF',
-    borderTopColor: 'transparent',
-    borderRightColor: 'transparent',
-    position: 'absolute',
+  routeDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  fab: {
-    marginTop: 5,
-    width: 70,
-    height: 70,
-    borderRadius: 100,
-    backgroundColor: '#0061FF',
+  distanceText: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 16,
+  },
+  arrivalText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  routeOptionsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  speedIndicatorContainer: {
+    position: 'absolute',
+    bottom: 160,
+    left: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  speedIndicator: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  speedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  // Arrival Prompt Styles
+  arrivalPromptOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  arrivalPrompt: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    marginHorizontal: 40,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 4,
     },
     shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  arrivalIcon: {
+    marginBottom: 20,
+  },
+  arrivalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  arrivalSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  arrivalConfirmButton: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 40,
+    paddingVertical: 15,
+    borderRadius: 12,
+    minWidth: 200,
+  },
+  arrivalConfirmText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  recenterFabContainer: {
+    position: 'absolute',
+    bottom: 160,
+    right: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 1000,
   },
-  distanceText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: -45,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  recenterFab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
