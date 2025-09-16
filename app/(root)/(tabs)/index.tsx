@@ -7,12 +7,12 @@ import {
     Dimensions,
     Image,
     ScrollView,
+    StatusBar,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import Filters from "@/components/Filters";
 import images from "@/constants/images";
@@ -103,10 +103,11 @@ const Home = () => {
 
 
   return (
-    <SafeAreaView className="h-full">
+    <View className="h-full">
+      <StatusBar hidden={true} />
       <LinearGradient
         colors={['#F0F9F4', '#E8F5E8', '#F0F9F4']}
-        style={{ flex: 1 }}
+        style={{ flex: 1, paddingTop: 44 }}
       >
       <ScrollView 
         showsVerticalScrollIndicator={false}
@@ -171,7 +172,7 @@ const Home = () => {
                   onChangeText={setSearchQuery}
                 />
               </View>
-              <TouchableOpacity className="bg-primary-300 w-16 h-16 rounded-full items-center justify-center mr-2">
+              <TouchableOpacity className="w-16 h-16 rounded-full items-center justify-center mr-2" style={{ backgroundColor: '#14b8a6' }}>
                 <Ionicons name="search" size={20} color="white" />
               </TouchableOpacity>
             </View>
@@ -330,7 +331,7 @@ const Home = () => {
         </View>
       </ScrollView>
       </LinearGradient>
-    </SafeAreaView>
+    </View>
   );
 };
 

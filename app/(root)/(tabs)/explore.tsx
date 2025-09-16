@@ -5,7 +5,7 @@ import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
 
@@ -73,21 +73,21 @@ const PropertyMarker = ({ property, onPress }: { property: any; onPress: (proper
       description={`$${property.price?.toLocaleString() || '0'} - ${property.bedrooms || 0} Bed, ${property.bathrooms || 0} Bath`}
       onPress={onPress}
     >
-      <View style={styles.customMarker}>
-        <View style={[
-          styles.pinContainer, 
-          { backgroundColor: getPropertyColor(property.type) }
-        ]}>
+      <View className="items-center justify-center">
+        <View 
+          className="w-8 h-8 rounded-full items-center justify-center border-2 border-white shadow-lg"
+          style={{ backgroundColor: getPropertyColor(property.type) }}
+        >
           <Ionicons 
             name={getPropertyIcon(property.type)} 
             size={16} 
             color="white" 
           />
         </View>
-        <View style={[
-          styles.pinPoint,
-          { borderTopColor: getPropertyColor(property.type) }
-        ]} />
+        <View 
+          className="w-0 h-0 border-l-2 border-r-2 border-t-3 border-l-transparent border-r-transparent -mt-px shadow-sm"
+          style={{ borderTopColor: getPropertyColor(property.type) }}
+        />
       </View>
     </Marker>
   );
@@ -995,11 +995,11 @@ const Explore = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1">
       {/* Search Bar and Filter - Hidden during navigation */}
       {!showRoute && (
         <>
-          <View className="absolute top-12 left-5 right-5 z-50 flex-row items-center gap-2 mt-2">
+          <View className="absolute top-14 left-5 right-5 z-50 flex-row items-center gap-2 mt-2">
             {/* Search Bar */}
             <View className="flex-1 flex-row items-center mb-6 bg-white rounded-full shadow-lg">
               <View className="flex-1 bg-white rounded-full px-3 py-3 mr-1">
@@ -1068,9 +1068,9 @@ const Explore = () => {
       )}
 
       {isInitialLoad || locationLoading || !location || !mapPreloaded ? (
-        <View style={styles.loadingContainer}>
+        <View className="flex-1 justify-center items-center bg-white">
           <ActivityIndicator size="large" color="#0061FF" />
-          <Text style={styles.loadingText}>
+          <Text className="mt-2.5 text-base text-gray-800">
             {locationLoading ? 'Getting your location...' : 
              !mapPreloaded ? 'Preparing map...' : 'Loading properties...'}
           </Text>
@@ -1079,7 +1079,7 @@ const Explore = () => {
         <MapView
           key="explore-map" // Stable key to prevent re-mounting
           ref={mapRef}
-          style={styles.map}
+          style={{ width: '100%', height: '100%' }}
           region={stableMapRegion}
           showsUserLocation={true}
           showsMyLocationButton={false}
@@ -1115,84 +1115,40 @@ const Explore = () => {
       {/* Gradient Overlay */}
       <LinearGradient
         colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.3)', 'transparent']}
-        style={styles.gradientOverlay}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 200,
+          zIndex: 10,
+        }}
         pointerEvents="none"
       />
 
-      {/* Property Type Legend - Only show when not in navigation mode */}
-      {!showRoute && (
-        <View style={styles.propertyLegend}>
-          <View style={styles.legendHeader}>
-            <Text style={styles.legendTitle}>Property Types</Text>
-          </View>
-          <View style={styles.legendItems}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, { backgroundColor: '#10B981' }]}>
-                <Ionicons name="home" size={12} color="white" />
-              </View>
-              <Text style={styles.legendText}>House</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, { backgroundColor: '#3B82F6' }]}>
-                <Ionicons name="business" size={12} color="white" />
-              </View>
-              <Text style={styles.legendText}>Apartment</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, { backgroundColor: '#8B5CF6' }]}>
-                <Ionicons name="business-sharp" size={12} color="white" />
-              </View>
-              <Text style={styles.legendText}>Condo</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, { backgroundColor: '#F59E0B' }]}>
-                <Ionicons name="home-outline" size={12} color="white" />
-              </View>
-              <Text style={styles.legendText}>Townhouse</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, { backgroundColor: '#EF4444' }]}>
-                <Ionicons name="diamond" size={12} color="white" />
-              </View>
-              <Text style={styles.legendText}>Villa</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, { backgroundColor: '#06B6D4' }]}>
-                <Ionicons name="copy" size={12} color="white" />
-              </View>
-              <Text style={styles.legendText}>Duplex</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendMarker, { backgroundColor: '#84CC16' }]}>
-                <Ionicons name="square" size={12} color="white" />
-              </View>
-              <Text style={styles.legendText}>Studio</Text>
-            </View>
-          </View>
-        </View>
-      )}
+    
 
 
       {/* Navigation UI - Top Bar */}
       {showRoute && (
-        <View style={styles.navigationTopBar}>
+        <View className="absolute top-20 left-0 right-0 z-50 px-4">
           {/* Main Navigation Instruction */}
-          <View style={styles.mainInstruction}>
-            <View style={styles.instructionContent}>
+            <View className="rounded-2xl px-8 py-5 flex-row items-center justify-between" style={{ backgroundColor: 'rgba(20, 184, 166, 0.9)' }}>
+            <View className="flex-row items-center">
               <Ionicons name="arrow-up" size={20} color="white" />
-              <Text style={styles.instructionText}>{currentInstruction}</Text>
+              <Text className="text-white text-2xl font-semibold ml-2">{currentInstruction}</Text>
             </View>
-            <TouchableOpacity style={styles.voiceButton}>
-              <View style={styles.voiceIcon}>
-                <View style={styles.voiceMic} />
+            <TouchableOpacity className="w-10 h-10 rounded-full bg-white justify-center items-center">
+              <View className="w-6 h-6 rounded-full bg-red-400 justify-center items-center">
+                <View className="w-3 h-3 rounded-full bg-white" />
               </View>
             </TouchableOpacity>
           </View>
           
           {/* Next Instruction - Only show when there's an upcoming turn */}
           {showNextInstruction && nextInstruction && (
-            <View style={styles.nextInstruction}>
-              <Text style={styles.nextInstructionText}>{nextInstruction}</Text>
+            <View className="bg-green-500 rounded-b-lg px-4 py-2 flex-row items-center max-w-1/3">
+              <Text className="text-white text-sm font-medium mr-2">{nextInstruction}</Text>
               <Ionicons name="arrow-forward" size={16} color="white" />
             </View>
           )}
@@ -1201,9 +1157,9 @@ const Explore = () => {
 
       {/* Navigation UI - Bottom Summary Bar */}
       {showRoute && (
-        <View style={styles.navigationBottomBar}>
+        <View className="absolute bottom-24 left-0 right-0 bg-white px-4 py-4 flex-row items-center justify-between border-t border-gray-200 z-50 mr-4 ml-4 rounded-2xl shadow-lg overflow-hidden">
           <TouchableOpacity 
-            style={styles.closeButton}
+            className="w-10 h-10 rounded-full bg-white justify-center items-center shadow-sm"
             onPress={() => {
               setShowRoute(false);
               setRouteCoordinates([]);
@@ -1226,20 +1182,20 @@ const Explore = () => {
             <Ionicons name="close" size={20} color="black" />
           </TouchableOpacity>
           
-          <View style={styles.routeInfo}>
-            <View style={styles.etaContainer}>
-              <Text style={styles.etaText}>{eta}</Text>
-              <TouchableOpacity style={styles.infoButton}>
+          <View className="flex-1 items-center mx-4">
+            <View className="flex-row items-center mb-1">
+              <Text className="text-green-600 text-lg font-bold mr-2">{eta}</Text>
+              <TouchableOpacity className="w-5 h-5 justify-center items-center">
                 <Ionicons name="information-circle" size={16} color="#666" />
               </TouchableOpacity>
             </View>
-            <View style={styles.routeDetails}>
-              <Text style={styles.distanceText}>{remainingDistance.toFixed(1)} km</Text>
-              <Text style={styles.arrivalText}>{arrivalTime}</Text>
+            <View className="flex-row items-center">
+              <Text className="text-gray-600 text-sm mr-4">{remainingDistance.toFixed(1)} km</Text>
+              <Text className="text-gray-600 text-sm">{arrivalTime}</Text>
             </View>
           </View>
           
-          <TouchableOpacity style={styles.routeOptionsButton}>
+          <TouchableOpacity className="w-10 h-10 rounded-full bg-white justify-center items-center shadow-sm">
             <Ionicons name="swap-horizontal" size={20} color="black" />
           </TouchableOpacity>
         </View>
@@ -1248,18 +1204,18 @@ const Explore = () => {
 
       {/* Navigation UI - Speed Indicator */}
       {showRoute && (
-        <View style={styles.speedIndicatorContainer}>
-          <View style={styles.speedIndicator}>
-            <Text style={styles.speedText}>{Math.round(currentSpeed)} km/h</Text>
+        <View className="absolute bottom-48 left-4 w-16 h-16 rounded-full shadow-lg z-50">
+          <View className="w-16 h-16 rounded-full bg-white justify-center items-center">
+            <Text className="text-xs font-semibold text-gray-800">{Math.round(currentSpeed)} km/h</Text>
           </View>
         </View>
       )}
 
       {/* Navigation UI - Recenter FAB */}
       {showRoute && (
-        <View style={styles.recenterFabContainer}>
+        <View className="absolute bottom-48 right-4 w-16 h-16 rounded-full shadow-lg z-50">
           <TouchableOpacity 
-            style={styles.recenterFab}
+            className="w-16 h-16 rounded-full bg-white justify-center items-center"
             onPress={() => {
               // Recenter map to user's location
               if (location) {
@@ -1280,20 +1236,20 @@ const Explore = () => {
 
       {/* Arrival Prompt Modal */}
       {showArrivalPrompt && (
-        <View style={styles.arrivalPromptOverlay}>
-          <View style={styles.arrivalPrompt}>
-            <View style={styles.arrivalIcon}>
+        <View className="absolute top-0 left-0 right-0 bottom-0 bg-black/50 justify-center items-center z-50">
+          <View className="bg-white rounded-2xl p-8 items-center mx-10 shadow-xl">
+            <View className="mb-5">
               <Ionicons name="checkmark-circle" size={60} color="#10B981" />
             </View>
-            <Text style={styles.arrivalTitle}>You have arrived!</Text>
-            <Text style={styles.arrivalSubtitle}>
+            <Text className="text-2xl font-bold text-gray-800 mb-2 text-center">You have arrived!</Text>
+            <Text className="text-base text-gray-600 mb-8 text-center">
               You have reached your destination
             </Text>
             <TouchableOpacity 
-              style={styles.arrivalConfirmButton}
+              className="bg-green-500 px-10 py-4 rounded-xl min-w-48"
               onPress={handleArrivalConfirmation}
             >
-              <Text style={styles.arrivalConfirmText}>End Navigation</Text>
+              <Text className="text-white text-lg font-semibold text-center">End Navigation</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1302,64 +1258,64 @@ const Explore = () => {
       {/* Property Modal */}
       {showPropertyModal && selectedProperty && (
         <TouchableOpacity 
-          style={styles.modalOverlay}
+          className="absolute top-0 left-0 right-0 bottom-24 z-50 justify-end pb-0 px-0 mr-4 ml-4"
           activeOpacity={1}
           onPress={closePropertyModal}
         >
               <TouchableOpacity
-            style={styles.propertyModal}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden pt-2 px-2 pb-4 max-h-3/5"
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
             {/* Property Image */}
-            <View style={styles.propertyImageContainer}>
+            <View className="relative h-40 rounded-xl overflow-hidden mb-2">
               <Image
                 source={
                   selectedProperty.images && selectedProperty.images.length > 0
                     ? { uri: selectedProperty.images[0] }
                     : require('@/assets/images/new-york.png')
                 }
-                style={styles.propertyImage}
+                className="w-full h-full rounded-xl"
                 resizeMode="cover"
               />
               
               {/* Property Type Badge */}
-              <View style={styles.propertyTypeBadge}>
-                <Text style={styles.propertyTypeText}>
+              <View className="absolute top-3 left-3 bg-black/80 px-3 py-1.5 rounded-full">
+                <Text className="text-white text-xs font-semibold">
                   {selectedProperty.type || 'Property'}
                 </Text>
               </View>
               
               {/* Favorite Button */}
-              <TouchableOpacity style={styles.favoriteButton}>
+              <TouchableOpacity className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm">
                 <Ionicons name="heart-outline" size={20} color="#666" />
               </TouchableOpacity>
             </View>
 
             {/* Property Details */}
-            <View style={styles.propertyDetails}>
+            <View className="px-2">
                 {/* Title and Price Row */}
-                <View style={styles.titlePriceRow}>
-                  <Text style={styles.propertyTitle} numberOfLines={1}>
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-base font-bold text-gray-800 flex-1 mr-2" numberOfLines={1}>
                     {selectedProperty.name || 'Property Name'}
                   </Text>
-                  <Text style={styles.propertyPrice}>
+                  <Text className="text-base font-bold text-gray-800">
                     ${selectedProperty.price?.toLocaleString() || '0'}
                   </Text>
                 </View>
 
               {/* Address and Distance Row */}
-              <View style={styles.addressDistanceRow}>
+              <View className="flex-row items-center justify-between mb-2">
                 {/* Address */}
-                <Text style={styles.propertyAddress} numberOfLines={1}>
+                <Text className="text-sm text-gray-600 flex-1 mr-2" numberOfLines={1}>
                   {selectedProperty.address || 'Address not available'}
                 </Text>
 
                 {/* Distance from User */}
                 {location && selectedProperty.latitude && selectedProperty.longitude && (
-                  <View style={styles.distanceContainer}>
+                  <View className="flex-row items-center">
                     <Ionicons name="location-outline" size={16} color="#10B981" />
-                    <Text style={styles.modalDistanceText}>
+                    <Text className="text-sm text-green-500 ml-1 font-medium">
                       {calculateDistance(
                         location.coords.latitude,
                         location.coords.longitude,
@@ -1372,30 +1328,31 @@ const Explore = () => {
               </View>
 
               {/* Feature Badges */}
-              <View style={styles.featureBadges}>
-                <View style={styles.featureBadge}>
+              <View className="flex-row gap-2">
+                <View className="flex-row items-center bg-gray-100 px-2.5 py-1.5 rounded-2xl">
                   <Ionicons name="bed-outline" size={16} color="#666" />
-                  <Text style={styles.featureText}>
+                  <Text className="text-xs text-gray-600 ml-1 font-medium">
                     {selectedProperty.bedrooms || 0} Beds
                   </Text>
                 </View>
-                <View style={styles.featureBadge}>
+                <View className="flex-row items-center bg-gray-100 px-2.5 py-1.5 rounded-2xl">
                   <Ionicons name="water-outline" size={16} color="#666" />
-                  <Text style={styles.featureText}>
+                  <Text className="text-xs text-gray-600 ml-1 font-medium">
                     {selectedProperty.bathrooms || 0} Baths
                   </Text>
                 </View>
-                <View style={styles.featureBadge}>
+                <View className="flex-row items-center bg-gray-100 px-2.5 py-1.5 rounded-2xl">
                   <Ionicons name="resize-outline" size={16} color="#666" />
-                  <Text style={styles.featureText}>
+                  <Text className="text-xs text-gray-600 ml-1 font-medium">
                     {selectedProperty.area || 0} Sqft
-              </Text>
-            </View>
-          </View>
+                  </Text>
+                </View>
+              </View>
 
               {/* View/Cancel Button */}
               <TouchableOpacity 
-                style={[styles.viewButton, isCalculatingRoute && styles.viewButtonDisabled]}
+                className={`flex-row items-center justify-center py-3 px-5 rounded-xl mt-3 ${isCalculatingRoute ? 'opacity-70' : ''}`}
+                style={{ backgroundColor: isCalculatingRoute ? '#9CA3AF' : '#3B82F6' }}
                 onPress={showRoute ? () => {
                   setShowRoute(false);
                   setRouteCoordinates([]);
@@ -1411,17 +1368,15 @@ const Explore = () => {
                 {isCalculatingRoute ? (
                   <>
                     <ActivityIndicator size="small" color="white" />
-                    <Text style={styles.viewButtonText}>Calculating Route...</Text>
+                    <Text className="text-white text-base font-semibold ml-2">Calculating Route...</Text>
                   </>
                 ) : showRoute ? (
                   <>
-                    <Ionicons name="close-outline" size={20} color="white" />
-                    <Text style={styles.viewButtonText}>Cancel Viewing</Text>
+                    <Text className="text-white text-base font-semibold ml-2">Cancel Viewing</Text>
                   </>
                 ) : (
                   <>
-                    <Ionicons name="eye-outline" size={20} color="white" />
-                    <Text style={styles.viewButtonText}>View Property</Text>
+                    <Text className="text-white text-base font-semibold ml-2">View Property</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1433,578 +1388,6 @@ const Explore = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#333',
-  },
-  customMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  pinContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  pinPoint: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 12,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  markerShadow: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: -2,
-    opacity: 0.6,
-  },
-  // Property Modal Styles - Navigation Style
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 100,
-    zIndex: 1000,
-    justifyContent: 'flex-end',
-    paddingBottom: 0,
-    paddingHorizontal: 0,
-  },
-  propertyModal: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    overflow: 'hidden',
-    paddingTop: 8,
-    paddingHorizontal: 8,
-    paddingBottom: 16,
-    maxHeight: '80%',
-  },
-  propertyImageContainer: {
-    position: 'relative',
-    height: 200,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  propertyImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 16,
-  },
-  propertyTypeBadge: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  propertyTypeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  favoriteButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 40,
-    height: 40,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  propertyDetails: {
-    paddingHorizontal: 8,
-  },
-  titlePriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  propertyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    flex: 1,
-    marginRight: 8,
-  },
-  propertyPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  addressDistanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  propertyAddress: {
-    fontSize: 14,
-    color: '#6b7280',
-    flex: 1,
-    marginRight: 8,
-  },
-  distanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modalDistanceText: {
-    fontSize: 14,
-    color: '#10B981',
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  featureBadges: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  featureBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  featureText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  viewButton: {
-    backgroundColor: '#0061FF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginTop: 12,
-  },
-  viewButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-    opacity: 0.7,
-  },
-  viewButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  // Gradient Overlay
-  gradientOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    zIndex: 1,
-  },
-  // Navigation UI Styles
-  navigationTopBar: {
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    paddingHorizontal: 16,
-
-  },
-  mainInstruction: {
-    backgroundColor: '#1F8A3A',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  instructionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  instructionText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  voiceButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  voiceIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FF6B6B',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  voiceMic: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'white',
-  },
-  nextInstruction: {
-    backgroundColor: '#2A9D4A',
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    maxWidth: '30%',
-  },
-  nextInstructionText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-    marginRight: 8,
-  },
-  navigationBottomBar: {
-    position: 'absolute',
-    bottom: 70,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-    zIndex: 1000,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  routeInfo: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 16,
-  },
-  etaContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  etaText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F8A3A',
-    marginRight: 8,
-  },
-  infoButton: {
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  routeDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  distanceText: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 16,
-  },
-  arrivalText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  routeOptionsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  speedIndicatorContainer: {
-    position: 'absolute',
-    bottom: 160,
-    left: 16,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 1000,
-  },
-  speedIndicator: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  speedText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
-  },
-  // Arrival Prompt Styles
-  arrivalPromptOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2000,
-  },
-  arrivalPrompt: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 30,
-    alignItems: 'center',
-    marginHorizontal: 40,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  arrivalIcon: {
-    marginBottom: 20,
-  },
-  arrivalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  arrivalSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginBottom: 30,
-    textAlign: 'center',
-  },
-  arrivalConfirmButton: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 12,
-    minWidth: 200,
-  },
-  arrivalConfirmText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  recenterFabContainer: {
-    position: 'absolute',
-    bottom: 160,
-    right: 16,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 1000,
-  },
-  recenterFab: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Property Legend Styles
-  propertyLegend: {
-    position: 'absolute',
-    bottom: 100,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 1000,
-  },
-  legendHeader: {
-    marginBottom: 8,
-  },
-  legendTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1f2937',
-    textAlign: 'center',
-  },
-  legendItems: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-    width: '48%',
-  },
-  legendMarker: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-});
 
 
 export default Explore;

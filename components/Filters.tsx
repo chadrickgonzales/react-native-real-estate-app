@@ -90,9 +90,10 @@ const Filters: React.FC<FiltersProps> = ({ propertyType, onCategoryChange }) => 
             key={index}
             className={`px-4 py-3 rounded-full mr-3 flex-row items-center ${
               isSelected
-                ? "bg-primary-300"
+                ? ""
                 : "bg-gray-100"
             }`}
+            style={isSelected ? { backgroundColor: '#14b8a6' } : {}}
           >
             <View className="flex-row items-center">
               <Ionicons 
