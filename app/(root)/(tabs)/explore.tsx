@@ -1,36 +1,13 @@
 import Filters from '@/components/Filters';
 import { getProperties } from '@/lib/appwrite';
+import { useGlobalContext } from '@/lib/global-provider';
 import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
-// Custom User Location Marker Component
-const UserLocationMarker = ({ location }: { location: any }) => {
-  return (
-    <Marker
-      coordinate={{
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      }}
-      title="Your Location"
-      description="You are here"
-    >
-      <View style={styles.userMarker}>
-        <View style={styles.userMarkerContainer}>
-          <Ionicons 
-            name="person" 
-            size={20} 
-            color="white" 
-          />
-        </View>
-      </View>
-    </Marker>
-  );
-};
 
 // Custom Property Marker Component
 const PropertyMarker = ({ property, onPress }: { property: any; onPress: (property: any) => void }) => {
@@ -38,17 +15,25 @@ const PropertyMarker = ({ property, onPress }: { property: any; onPress: (proper
     switch (propertyType?.toLowerCase()) {
       case 'house':
       case 'home':
-        return 'home';
+        return 'home'; // Traditional house icon
       case 'apartment':
-        return 'business';
+        return 'business'; // Building icon for apartments
       case 'condo':
-        return 'business-outline';
+      case 'condos':
+        return 'business-sharp'; // Modern building icon for condos
       case 'townhouse':
-        return 'home-outline';
+      case 'townhomes':
+        return 'home-outline'; // Outlined house for townhouses
       case 'villa':
-        return 'home-sharp';
+        return 'diamond'; // Diamond icon for luxury villas
+      case 'duplex':
+      case 'duplexes':
+        return 'copy'; // Copy icon representing duplex structure
+      case 'studio':
+      case 'studios':
+        return 'square'; // Square icon for studios
       default:
-        return 'home';
+        return 'home'; // Default house icon
     }
   };
 
@@ -56,17 +41,25 @@ const PropertyMarker = ({ property, onPress }: { property: any; onPress: (proper
     switch (propertyType?.toLowerCase()) {
       case 'house':
       case 'home':
-        return '#10B981'; // Green
+        return '#10B981'; // Emerald Green - Traditional homes
       case 'apartment':
-        return '#3B82F6'; // Blue
+        return '#3B82F6'; // Blue - Modern apartments
       case 'condo':
-        return '#8B5CF6'; // Purple
+      case 'condos':
+        return '#8B5CF6'; // Purple - Luxury condos
       case 'townhouse':
-        return '#F59E0B'; // Orange
+      case 'townhomes':
+        return '#F59E0B'; // Amber - Townhouses
       case 'villa':
-        return '#EF4444'; // Red
+        return '#EF4444'; // Red - Luxury villas
+      case 'duplex':
+      case 'duplexes':
+        return '#06B6D4'; // Cyan - Duplexes
+      case 'studio':
+      case 'studios':
+        return '#84CC16'; // Lime Green - Studios
       default:
-        return '#6B7280'; // Gray
+        return '#6B7280'; // Gray - Default
     }
   };
 
@@ -82,18 +75,18 @@ const PropertyMarker = ({ property, onPress }: { property: any; onPress: (proper
     >
       <View style={styles.customMarker}>
         <View style={[
-          styles.markerContainer, 
+          styles.pinContainer, 
           { backgroundColor: getPropertyColor(property.type) }
         ]}>
           <Ionicons 
             name={getPropertyIcon(property.type)} 
-            size={20} 
+            size={16} 
             color="white" 
           />
         </View>
         <View style={[
-          styles.markerShadow, 
-          { backgroundColor: getPropertyColor(property.type) }
+          styles.pinPoint,
+          { borderTopColor: getPropertyColor(property.type) }
         ]} />
       </View>
     </Marker>
@@ -263,7 +256,7 @@ const mapStyle = [
 ];
 
 const Explore = () => {
-  const [location, setLocation] = useState<any>(null);
+  const { location, locationLoading, locationError, mapPreloaded } = useGlobalContext();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mapRegion, setMapRegion] = useState<any>(null);
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
@@ -295,76 +288,23 @@ const Explore = () => {
 
   // Fetch all properties with coordinates
   const { data: properties, loading: isLoading, refetch: refetchProperties } = useAppwrite({
-    fn: () => getProperties({ 
-      filter: selectedCategory, 
-      query: searchQuery, 
+    fn: ({ filter, query, limit, propertyType }: { filter: string; query: string; limit: number; propertyType: string }) => 
+      getProperties({
+        filter,
+        query,
+        limit,
+        propertyType,
+      }),
+    params: {
+      filter: selectedCategory,
+      query: searchQuery,
       limit: 100,
-      propertyType: propertyTypeFilter
-    }),
-    params: {},
+      propertyType: propertyTypeFilter,
+    },
     skip: false,
   });
 
-  useEffect(() => {
-    (async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setErrorMsg('Permission to access location was denied');
-          return;
-        }
-
-        // Get initial location with high accuracy
-        let currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-        
-        setLocation(currentLocation);
-        
-        // Set map region to center on user's location immediately
-        setMapRegion({
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-
-        // Start watching location changes
-        locationSubscriptionRef.current = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: 1000, // Update every second
-            distanceInterval: 1, // Update every meter
-          },
-          (newLocation) => {
-            setLocation(newLocation);
-            
-            // Update map region to follow user if in following mode
-            if (cameraMode === 'following' || cameraMode === 'navigation') {
-              setMapRegion({
-                latitude: newLocation.coords.latitude,
-                longitude: newLocation.coords.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              });
-            }
-          }
-        );
-      } catch (error) {
-        console.error('Error getting location:', error);
-        setErrorMsg('Failed to get your location. Please check your GPS settings.');
-      }
-    })();
-
-    // Cleanup location subscription on unmount
-    return () => {
-      if (locationSubscriptionRef.current) {
-        locationSubscriptionRef.current.remove();
-      }
-    };
-  }, [cameraMode]);
-
-  // Set initial map region to user's location immediately
+  // Set map region when location is available from global context
   useEffect(() => {
     if (location && !mapRegion) {
       setMapRegion({
@@ -388,32 +328,12 @@ const Explore = () => {
 
   // Track initial load completion
   useEffect(() => {
-    if (!isLoading && isInitialLoad) {
+    if (!isLoading && !locationLoading && mapPreloaded && isInitialLoad) {
       setIsInitialLoad(false);
     }
-  }, [isLoading, isInitialLoad]);
+  }, [isLoading, locationLoading, mapPreloaded, isInitialLoad]);
 
-  // Debounced search effect - only for search query
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    searchTimeoutRef.current = setTimeout(async () => {
-      await refetchProperties({ 
-        filter: selectedCategory, 
-        query: searchQuery, 
-        limit: 100,
-        propertyType: propertyTypeFilter
-      });
-    }, 500); // 500ms delay
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery]); // Only trigger on search query changes
+  // Search is now handled automatically by useAppwrite hook when searchQuery changes
 
   // Filter properties that have valid coordinates - memoized to prevent unnecessary re-filtering
   const propertiesWithCoords = useMemo(() => {
@@ -1102,21 +1022,22 @@ const Explore = () => {
             </View>
 
             {/* Rent/Buy Filter */}
-            <TouchableOpacity
-              className="bg-white w-16 h-16 mb-6 rounded-full items-center justify-center shadow-lg"
-              onPress={async () => {
-                const newFilter = propertyTypeFilter === 'sell' ? 'rent' : 'sell';
-                setPropertyTypeFilter(newFilter);
-                // Refetch properties with new filter
-                await refetchProperties({ 
-                  filter: selectedCategory, 
-                  query: searchQuery, 
-                  limit: 100,
-                  propertyType: newFilter
-                });
-              }}
-              activeOpacity={1}
-            >
+              <TouchableOpacity
+                className="bg-white w-16 h-16 mb-6 rounded-full items-center justify-center shadow-lg"
+                onPress={async () => {
+                  const newFilter = propertyTypeFilter === 'sell' ? 'rent' : 'sell';
+                  setPropertyTypeFilter(newFilter);
+                  
+                  // Manually refetch data with new filter and current category
+                  await refetchProperties({ 
+                    filter: selectedCategory, 
+                    query: searchQuery, 
+                    limit: 100,
+                    propertyType: newFilter
+                  });
+                }}
+                activeOpacity={1}
+              >
               <Ionicons 
                 name={propertyTypeFilter === 'sell' ? 'home-outline' : 'key-outline'} 
                 size={24} 
@@ -1132,7 +1053,7 @@ const Explore = () => {
                 propertyType={propertyTypeFilter}
                 onCategoryChange={async (category) => {
                   setSelectedCategory(category);
-                  // Refetch properties with new category filter
+                  // Refetch data with new category filter
                   await refetchProperties({ 
                     filter: category, 
                     query: searchQuery, 
@@ -1146,11 +1067,12 @@ const Explore = () => {
         </>
       )}
 
-      {isInitialLoad || !location ? (
+      {isInitialLoad || locationLoading || !location || !mapPreloaded ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0061FF" />
           <Text style={styles.loadingText}>
-            {!location ? 'Getting your location...' : 'Loading properties...'}
+            {locationLoading ? 'Getting your location...' : 
+             !mapPreloaded ? 'Preparing map...' : 'Loading properties...'}
           </Text>
         </View>
       ) : (
@@ -1168,10 +1090,6 @@ const Explore = () => {
           userLocationUpdateInterval={1000}
           userLocationFastestInterval={500}
         >
-          {/* User's current location marker */}
-          {location && (
-            <UserLocationMarker location={location} />
-          )}
           
           {/* Property markers from database */}
           {propertiesWithCoords.map((property, index) => (
@@ -1200,6 +1118,59 @@ const Explore = () => {
         style={styles.gradientOverlay}
         pointerEvents="none"
       />
+
+      {/* Property Type Legend - Only show when not in navigation mode */}
+      {!showRoute && (
+        <View style={styles.propertyLegend}>
+          <View style={styles.legendHeader}>
+            <Text style={styles.legendTitle}>Property Types</Text>
+          </View>
+          <View style={styles.legendItems}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, { backgroundColor: '#10B981' }]}>
+                <Ionicons name="home" size={12} color="white" />
+              </View>
+              <Text style={styles.legendText}>House</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, { backgroundColor: '#3B82F6' }]}>
+                <Ionicons name="business" size={12} color="white" />
+              </View>
+              <Text style={styles.legendText}>Apartment</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, { backgroundColor: '#8B5CF6' }]}>
+                <Ionicons name="business-sharp" size={12} color="white" />
+              </View>
+              <Text style={styles.legendText}>Condo</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, { backgroundColor: '#F59E0B' }]}>
+                <Ionicons name="home-outline" size={12} color="white" />
+              </View>
+              <Text style={styles.legendText}>Townhouse</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, { backgroundColor: '#EF4444' }]}>
+                <Ionicons name="diamond" size={12} color="white" />
+              </View>
+              <Text style={styles.legendText}>Villa</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, { backgroundColor: '#06B6D4' }]}>
+                <Ionicons name="copy" size={12} color="white" />
+              </View>
+              <Text style={styles.legendText}>Duplex</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendMarker, { backgroundColor: '#84CC16' }]}>
+                <Ionicons name="square" size={12} color="white" />
+              </View>
+              <Text style={styles.legendText}>Studio</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
 
       {/* Navigation UI - Top Bar */}
@@ -1502,25 +1473,13 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  markerShadow: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: -2,
-    opacity: 0.6,
-  },
-  userMarker: {
+  pinContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  userMarkerContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0066FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: 'white',
     shadowColor: '#000',
     shadowOffset: {
@@ -1530,6 +1489,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  pinPoint: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  markerShadow: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: -2,
+    opacity: 0.6,
   },
   // Property Modal Styles - Navigation Style
   modalOverlay: {
@@ -1957,6 +1941,68 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Property Legend Styles
+  propertyLegend: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 1000,
+  },
+  legendHeader: {
+    marginBottom: 8,
+  },
+  legendTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    textAlign: 'center',
+  },
+  legendItems: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    width: '48%',
+  },
+  legendMarker: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
   },
 });
 

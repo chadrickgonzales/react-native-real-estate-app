@@ -332,6 +332,8 @@ export async function getLatestProperties(propertyType?: string, filter?: string
     );
 
     console.log("Raw properties from database:", result.documents.length);
+    console.log("Query filter applied:", filter);
+    console.log("Property types in results:", result.documents.map(p => p.type));
 
     // Parse images for each property
     const propertiesWithImages = result.documents.map(property => {
@@ -399,6 +401,8 @@ export async function getProperties({
     );
 
     console.log("Raw properties from database:", result.documents.length);
+    console.log("Query filter applied:", filter);
+    console.log("Property types in results:", result.documents.map(p => p.type));
 
     // Parse images for each property
     const propertiesWithImages = result.documents.map(property => {
@@ -650,12 +654,13 @@ export async function testAppwriteSetup() {
     
     // Test 4: Try to list properties (this will test database connection)
     try {
-      await databases.listDocuments(
+      const result = await databases.listDocuments(
         config.databaseId!,
         config.propertiesCollectionId!,
-        [Query.limit(1)]
+        [Query.limit(10)]
       );
       console.log("✅ Database connection successful");
+      console.log("📊 Property types in database:", [...new Set(result.documents.map(p => p.type))]);
     } catch (dbError) {
       console.log("⚠️ Database connection test failed:", dbError);
     }

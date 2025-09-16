@@ -64,7 +64,6 @@ export const categories = [
   { title: "Duplexes", category: "Duplexes" },
   { title: "Studios", category: "Studios" },
   { title: "Townhomes", category: "Townhomes" },
-  { title: "Others", category: "Others" },
 ];
 
 export const settings = [

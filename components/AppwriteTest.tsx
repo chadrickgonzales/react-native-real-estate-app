@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import { testAppwriteSetup, testImageUpload } from '../lib/appwrite';
+import { getProperties, testAppwriteSetup, testImageUpload } from '../lib/appwrite';
+import seed from '../lib/seed';
 
 const AppwriteTest = () => {
   const [isTesting, setIsTesting] = useState(false);
@@ -34,36 +35,93 @@ const AppwriteTest = () => {
     }
   };
 
+  const runSeed = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    
+    try {
+      await seed();
+      setTestResult("✅ Database seeded with 60 properties successfully!");
+    } catch (error: any) {
+      setTestResult(`❌ Seed error: ${error.message}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const checkDatabase = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    
+    try {
+      const allProperties = await getProperties({ filter: 'All', query: '', limit: 100 });
+      const uniqueTypes = [...new Set(allProperties.map(p => p.type))];
+      setTestResult(`📊 Database has ${allProperties.length} properties. Types: ${uniqueTypes.join(', ')}`);
+    } catch (error: any) {
+      setTestResult(`❌ Database check error: ${error.message}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   return (
     <View className="p-4 bg-white rounded-lg shadow-md m-4">
       <Text className="text-lg font-rubik-bold text-black mb-4">
         Appwrite Setup Test
       </Text>
       
-      <View className="flex-row space-x-2">
-        <TouchableOpacity
-          onPress={runTest}
-          disabled={isTesting}
-          className={`flex-1 py-3 px-4 rounded-lg ${
-            isTesting ? 'bg-gray-400' : 'bg-blue-600'
-          }`}
-        >
-          <Text className="text-white font-rubik-bold text-center">
-            {isTesting ? 'Testing...' : 'Test Setup'}
-          </Text>
-        </TouchableOpacity>
+      <View className="space-y-2">
+        <View className="flex-row space-x-2">
+          <TouchableOpacity
+            onPress={runTest}
+            disabled={isTesting}
+            className={`flex-1 py-3 px-4 rounded-lg ${
+              isTesting ? 'bg-gray-400' : 'bg-blue-600'
+            }`}
+          >
+            <Text className="text-white font-rubik-bold text-center">
+              {isTesting ? 'Testing...' : 'Test Setup'}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={runImageTest}
+            disabled={isTesting}
+            className={`flex-1 py-3 px-4 rounded-lg ${
+              isTesting ? 'bg-gray-400' : 'bg-green-600'
+            }`}
+          >
+            <Text className="text-white font-rubik-bold text-center">
+              {isTesting ? 'Testing...' : 'Test Upload'}
+            </Text>
+          </TouchableOpacity>
+        </View>
         
-        <TouchableOpacity
-          onPress={runImageTest}
-          disabled={isTesting}
-          className={`flex-1 py-3 px-4 rounded-lg ${
-            isTesting ? 'bg-gray-400' : 'bg-green-600'
-          }`}
-        >
-          <Text className="text-white font-rubik-bold text-center">
-            {isTesting ? 'Testing...' : 'Test Upload'}
-          </Text>
-        </TouchableOpacity>
+        <View className="flex-row space-x-2">
+          <TouchableOpacity
+            onPress={runSeed}
+            disabled={isTesting}
+            className={`flex-1 py-3 px-4 rounded-lg ${
+              isTesting ? 'bg-gray-400' : 'bg-purple-600'
+            }`}
+          >
+            <Text className="text-white font-rubik-bold text-center">
+              {isTesting ? 'Seeding...' : 'Seed Database'}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={checkDatabase}
+            disabled={isTesting}
+            className={`flex-1 py-3 px-4 rounded-lg ${
+              isTesting ? 'bg-gray-400' : 'bg-orange-600'
+            }`}
+          >
+            <Text className="text-white font-rubik-bold text-center">
+              {isTesting ? 'Checking...' : 'Check Database'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       {testResult && (
@@ -79,6 +137,7 @@ const AppwriteTest = () => {
         • Storage bucket setup
         • Database connection
         • Collection permissions
+        • Seed database with 60 properties (30 rent, 30 sale)
       </Text>
     </View>
   );

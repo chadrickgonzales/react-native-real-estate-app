@@ -1,7 +1,7 @@
 import { ID } from "react-native-appwrite";
 import { config, databases } from "./appwrite";
 import {
-  propertiesImages,
+    propertiesImages,
 } from "./data";
 
 const COLLECTIONS = {
@@ -16,7 +16,6 @@ const propertyTypes = [
   "Duplexes",
   "Studios",
   "Townhomes",
-  "Others",
 ];
 
 const propertyCategories = [
@@ -27,7 +26,6 @@ const propertyCategories = [
   "Duplexes",
   "Studios",
   "Townhomes",
-  "Others",
 ];
 
 
@@ -224,7 +222,7 @@ async function seed() {
     console.log("Cleared all existing properties.");
 
     // Seed Properties
-    for (let i = 1; i <= 20; i++) {
+    for (let i = 1; i <= 60; i++) {
       const selectedAmenities = amenities
         .sort(() => 0.5 - Math.random())
         .slice(0, Math.floor(Math.random() * 5) + 3); // 3-7 amenities
@@ -250,6 +248,9 @@ async function seed() {
       const availableDate = new Date();
       availableDate.setDate(availableDate.getDate() + Math.floor(Math.random() * 90));
 
+      // Generate consistent property type for this property
+      const selectedPropertyType = propertyTypes[Math.floor(Math.random() * propertyTypes.length)];
+      
       const property = await databases.createDocument(
         config.databaseId!,
         COLLECTIONS.PROPERTY!,
@@ -257,8 +258,8 @@ async function seed() {
         {
           // Basic property information
           name: generatePropertyName(),
-          type: propertyTypes[Math.floor(Math.random() * propertyTypes.length)],
-          description: `Beautiful ${propertyTypes[Math.floor(Math.random() * propertyTypes.length)]} located in a prime area. This property features modern amenities and is perfect for ${propertyType === 'sell' ? 'buyers' : 'renters'} looking for quality living space.`,
+          type: selectedPropertyType,
+          description: `Beautiful ${selectedPropertyType} located in a prime area. This property features modern amenities and is perfect for ${propertyType === 'sell' ? 'buyers' : 'renters'} looking for quality living space.`,
           address: `${Math.floor(Math.random() * 999) + 1} ${['Rizal St', 'Burgos Ave', 'Mabini Rd', 'Luna St', 'Bonifacio Ave', 'Quezon Blvd', 'Tarlac-MacArthur Hwy', 'San Miguel St', 'San Nicolas Ave', 'San Sebastian Rd'][Math.floor(Math.random() * 10)]}, Tarlac City, Tarlac`,
           price: propertyType === 'sell' 
             ? Math.floor(Math.random() * 8000000) + 2000000 // ₱2M - ₱10M for sale
