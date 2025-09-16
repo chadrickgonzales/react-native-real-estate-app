@@ -33,10 +33,10 @@ const Property = () => {
   });
 
   const formatPrice = (price: number) => {
-    if (!price || isNaN(price)) return '$0';
-    return new Intl.NumberFormat('en-US', {
+    if (!price || isNaN(price)) return '₱0';
+    return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'PHP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);
@@ -189,7 +189,7 @@ const Property = () => {
               {/* Title and Rating */}
               <View className="flex-row items-center justify-between mb-3">
                 <Text className="text-2xl font-rubik-bold text-gray-900 flex-1">
-                  Home in Dickinson
+                  {property.name || `${getPropertyTypeDisplay()} ${getLocationFromAddress(property.address)}`}
                 </Text>
                 <View className="flex-row items-center">
                   <Ionicons name="star" size={16} color="#F59E0B" />
@@ -217,7 +217,9 @@ const Property = () => {
               <Text className="text-lg font-rubik-bold text-gray-900 mb-3">Description</Text>
               <Text className="text-gray-600 font-rubik leading-6">
                 {property.description || 'This exquisitely engineered property is a masterpiece of superior craftsmanship and modern design.'}
-                <Text className="text-blue-600 font-rubik-medium"> more</Text>
+                {property.description && property.description.length > 100 && (
+                  <Text className="text-blue-600 font-rubik-medium"> more</Text>
+                )}
               </Text>
             </View>
 
@@ -231,7 +233,7 @@ const Property = () => {
                   { icon: 'restaurant-outline', text: `${property.kitchens || 1} Kitchen` },
                   { icon: 'resize-outline', text: `${property.area || 0} sq ft` },
                   { icon: 'car-outline', text: `${property.parkingSpaces || 1} Parking` },
-                  { icon: 'calendar-outline', text: 'Available Now' }
+                  { icon: 'calendar-outline', text: property.availableDate ? new Date(property.availableDate).toLocaleDateString() : 'Available Now' }
                 ]}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -273,11 +275,11 @@ const Property = () => {
                   </View>
                   <View className="w-1/2 mb-3">
                     <Text className="text-xs text-gray-500 font-rubik-medium mb-1">HOA Fees</Text>
-                    <Text className="text-gray-900 font-rubik-bold">{property.hoaFees ? `$${property.hoaFees}/mo` : 'N/A'}</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.hoaFees ? `${property.hoaFees}/mo` : 'N/A'}</Text>
                   </View>
                   <View className="w-1/2 mb-3">
                     <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Property Taxes</Text>
-                    <Text className="text-gray-900 font-rubik-bold">{property.propertyTaxes ? `$${property.propertyTaxes}/yr` : 'N/A'}</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.propertyTaxes ? `${property.propertyTaxes}/yr` : 'N/A'}</Text>
                   </View>
                 </View>
               </View>
@@ -294,11 +296,11 @@ const Property = () => {
                   </View>
                   <View className="w-1/2 mb-3">
                     <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Security Deposit</Text>
-                    <Text className="text-gray-900 font-rubik-bold">{property.deposit ? `$${property.deposit}` : 'N/A'}</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.deposit ? `${property.deposit}` : 'N/A'}</Text>
                   </View>
                   <View className="w-1/2 mb-3">
                     <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Pet Deposit</Text>
-                    <Text className="text-gray-900 font-rubik-bold">{property.petDeposit ? `$${property.petDeposit}` : 'N/A'}</Text>
+                    <Text className="text-gray-900 font-rubik-bold">{property.petDeposit ? `${property.petDeposit}` : 'N/A'}</Text>
                   </View>
                   <View className="w-1/2 mb-3">
                     <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Available Date</Text>
@@ -424,9 +426,9 @@ const Property = () => {
       </ScrollView>
 
       {/* Bottom Action Buttons */}
-      <View className="px-4 py-4 bg-gray-100">
-        <View className="bg-white rounded-3xl shadow-lg p-4">
-          <View className="flex-row space-x-3">
+      <View className="px-4 py-2 bg-white">
+        <View className="bg-white p-4">
+          <View className="flex-row gap-4">
             <TouchableOpacity className="flex-1 bg-blue-100 py-4 rounded-full flex-row items-center justify-center">
               <Ionicons name="chatbubble-outline" size={20} color="#3B82F6" />
               <Text className="text-blue-600 font-rubik-bold ml-2">Message</Text>

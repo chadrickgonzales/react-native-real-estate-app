@@ -1,14 +1,14 @@
 import * as Linking from "expo-linking";
 import { openAuthSessionAsync } from "expo-web-browser";
 import {
-    Account,
-    Avatars,
-    Client,
-    Databases,
-    ID,
-    OAuthProvider,
-    Query,
-    Storage
+  Account,
+  Avatars,
+  Client,
+  Databases,
+  ID,
+  OAuthProvider,
+  Query,
+  Storage
 } from "react-native-appwrite";
 
 export const config = {
@@ -335,7 +335,7 @@ export async function getLatestProperties(propertyType?: string, filter?: string
     console.log("Query filter applied:", filter);
     console.log("Property types in results:", result.documents.map(p => p.type));
 
-    // Parse images for each property
+    // Images for each property
     const propertiesWithImages = result.documents.map(property => {
       let parsedImages: string[] = [];
       if (property.images) {

@@ -3,15 +3,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    ScrollView,
-    StatusBar,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import Filters from "@/components/Filters";
@@ -135,18 +135,7 @@ const Home = () => {
 
             {/* Action Buttons */}
             <View className="flex-row items-center gap-2">
-              {/* Seed Database Button */}
-              <TouchableOpacity 
-                className="p-2 bg-blue-500 rounded-full shadow-md"
-                onPress={handleSeedDatabase}
-                disabled={isSeeding}
-              >
-                {isSeeding ? (
-                  <ActivityIndicator size={20} color="white" />
-                ) : (
-                  <Ionicons name="refresh" size={20} color="white" />
-                )}
-              </TouchableOpacity>
+              
               
               {/* Notification Button */}
               <View className="p-2 bg-white rounded-full shadow-md">

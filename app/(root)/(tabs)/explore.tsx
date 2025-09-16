@@ -1011,8 +1011,9 @@ const Explore = () => {
                   onChangeText={setSearchQuery}
                 />
               </View>
-              <TouchableOpacity 
-                className="bg-primary-300 w-16 h-16 rounded-full items-center justify-center mr-2"
+              <TouchableOpacity
+                className="w-16 h-16 rounded-full items-center justify-center mr-2"
+                style={{ backgroundColor: '#14b8a6' }}
                 onPress={() => {
                   // Search is handled automatically by debounced effect
                 }}
@@ -1133,7 +1134,7 @@ const Explore = () => {
       {showRoute && (
         <View className="absolute top-20 left-0 right-0 z-50 px-4">
           {/* Main Navigation Instruction */}
-            <View className="rounded-2xl px-8 py-5 flex-row items-center justify-between" style={{ backgroundColor: 'rgba(20, 184, 166, 0.9)' }}>
+            <View className="rounded-t-2xl px-8 py-5 flex-row items-center justify-between" style={{ backgroundColor: 'rgba(20, 184, 166, 0.9)' }}>
             <View className="flex-row items-center">
               <Ionicons name="arrow-up" size={20} color="white" />
               <Text className="text-white text-2xl font-semibold ml-2">{currentInstruction}</Text>
@@ -1147,7 +1148,7 @@ const Explore = () => {
           
           {/* Next Instruction - Only show when there's an upcoming turn */}
           {showNextInstruction && nextInstruction && (
-            <View className="bg-green-500 rounded-b-lg px-4 py-2 flex-row items-center max-w-1/3">
+            <View className="rounded-b-lg px-4 py-2 flex-row items-center max-w-1/3" style={{ backgroundColor: 'rgba(20, 184, 166, 0.9)' }}>
               <Text className="text-white text-sm font-medium mr-2">{nextInstruction}</Text>
               <Ionicons name="arrow-forward" size={16} color="white" />
             </View>
@@ -1157,7 +1158,7 @@ const Explore = () => {
 
       {/* Navigation UI - Bottom Summary Bar */}
       {showRoute && (
-        <View className="absolute bottom-24 left-0 right-0 bg-white px-4 py-4 flex-row items-center justify-between border-t border-gray-200 z-50 mr-4 ml-4 rounded-2xl shadow-lg overflow-hidden">
+        <View className="absolute bottom-28 left-0 right-0 bg-white px-4 py-4 flex-row items-center justify-between border-t border-gray-200 z-50 mr-4 ml-4 rounded-2xl shadow-lg overflow-hidden">
           <TouchableOpacity 
             className="w-10 h-10 rounded-full bg-white justify-center items-center shadow-sm"
             onPress={() => {
@@ -1204,7 +1205,7 @@ const Explore = () => {
 
       {/* Navigation UI - Speed Indicator */}
       {showRoute && (
-        <View className="absolute bottom-48 left-4 w-16 h-16 rounded-full shadow-lg z-50">
+        <View className="absolute bottom-52 left-4 w-16 h-16 rounded-full shadow-lg z-50">
           <View className="w-16 h-16 rounded-full bg-white justify-center items-center">
             <Text className="text-xs font-semibold text-gray-800">{Math.round(currentSpeed)} km/h</Text>
           </View>
@@ -1213,7 +1214,7 @@ const Explore = () => {
 
       {/* Navigation UI - Recenter FAB */}
       {showRoute && (
-        <View className="absolute bottom-48 right-4 w-16 h-16 rounded-full shadow-lg z-50">
+        <View className="absolute bottom-52 right-4 w-16 h-16 rounded-full shadow-lg z-50">
           <TouchableOpacity 
             className="w-16 h-16 rounded-full bg-white justify-center items-center"
             onPress={() => {
@@ -1258,7 +1259,7 @@ const Explore = () => {
       {/* Property Modal */}
       {showPropertyModal && selectedProperty && (
         <TouchableOpacity 
-          className="absolute top-0 left-0 right-0 bottom-24 z-50 justify-end pb-0 px-0 mr-4 ml-4"
+          className="absolute top-0 left-0 right-0 bottom-28 z-50 justify-end pb-0 px-0 mr-4 ml-4"
           activeOpacity={1}
           onPress={closePropertyModal}
         >
@@ -1376,7 +1377,7 @@ const Explore = () => {
                   </>
                 ) : (
                   <>
-                    <Text className="text-white text-base font-semibold ml-2">View Property</Text>
+                    <Text className="text-white text-sm font-semibold ml-2">View Property</Text>
                   </>
                 )}
               </TouchableOpacity>
