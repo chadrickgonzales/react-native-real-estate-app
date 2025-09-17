@@ -2,13 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
-  Dimensions,
-  FlatList,
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View
+    Dimensions,
+    FlatList,
+    Image,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -428,6 +428,26 @@ const Property = () => {
       {/* Bottom Action Buttons */}
       <View className="px-4 py-2 bg-white">
         <View className="bg-white p-4">
+          {/* Explore Similar Properties Button */}
+          <TouchableOpacity 
+            className="bg-purple-100 py-4 rounded-full flex-row items-center justify-center mb-4"
+            onPress={() => {
+              router.push({
+                pathname: '/(root)/(tabs)/explore',
+                params: {
+                  propertyId: property.$id,
+                  propertyType: property.type,
+                  latitude: property.latitude?.toString(),
+                  longitude: property.longitude?.toString(),
+                  openModal: 'true'
+                }
+              });
+            }}
+          >
+            <Ionicons name="map-outline" size={20} color="#8B5CF6" />
+            <Text className="text-purple-600 font-rubik-bold ml-2">Explore Similar Properties</Text>
+          </TouchableOpacity>
+          
           <View className="flex-row gap-4">
             <TouchableOpacity className="flex-1 bg-blue-100 py-4 rounded-full flex-row items-center justify-center">
               <Ionicons name="chatbubble-outline" size={20} color="#3B82F6" />

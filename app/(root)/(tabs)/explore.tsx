@@ -1,11 +1,13 @@
 import Filters from '@/components/Filters';
 import { getProperties } from '@/lib/appwrite';
+import { calculateDistance, filterPropertiesByDistance, geocodeSearchTerm, getSearchSuggestions } from '@/lib/geocoding';
 import { useGlobalContext } from '@/lib/global-provider';
 import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
 
@@ -257,6 +259,13 @@ const mapStyle = [
 
 const Explore = () => {
   const { location, locationLoading, locationError, mapPreloaded } = useGlobalContext();
+  const params = useLocalSearchParams<{
+    propertyId?: string;
+    propertyType?: string;
+    latitude?: string;
+    longitude?: string;
+    openModal?: string;
+  }>();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mapRegion, setMapRegion] = useState<any>(null);
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
@@ -264,6 +273,9 @@ const Explore = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<'rent' | 'sell'>('sell');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchLocation, setSearchLocation] = useState<{latitude: number, longitude: number, placeName: string} | null>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
   const [showRoute, setShowRoute] = useState(false);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
@@ -316,6 +328,65 @@ const Explore = () => {
     }
   }, [location, mapRegion]);
 
+  // Handle incoming parameters from property detail page
+  useEffect(() => {
+    if (params.openModal === 'true' && params.propertyId && params.latitude && params.longitude) {
+      // Set the property type filter if provided and different from current
+      if (params.propertyType && params.propertyType !== propertyTypeFilter) {
+        setPropertyTypeFilter(params.propertyType as 'rent' | 'sell');
+      }
+      
+      // Pan camera to the specific property location
+      const targetLatitude = parseFloat(params.latitude);
+      const targetLongitude = parseFloat(params.longitude);
+      
+      if (!isNaN(targetLatitude) && !isNaN(targetLongitude)) {
+        setMapRegion({
+          latitude: targetLatitude,
+          longitude: targetLongitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        });
+      }
+    }
+  }, [params.openModal, params.propertyId, params.latitude, params.longitude, params.propertyType]);
+
+  // Separate effect to handle opening the modal when properties are loaded
+  useEffect(() => {
+    if (params.openModal === 'true' && params.propertyId && properties && properties.length > 0) {
+      const targetProperty = properties.find(p => p.$id === params.propertyId);
+      if (targetProperty && (!selectedProperty || selectedProperty.$id !== targetProperty.$id)) {
+        setSelectedProperty(targetProperty);
+        setShowPropertyModal(true);
+      }
+    }
+  }, [params.openModal, params.propertyId, properties, selectedProperty]);
+
+  // Cleanup effect to close modal when navigating away or parameters change
+  useEffect(() => {
+    // If openModal is not 'true' or propertyId changes, close the modal
+    if (params.openModal !== 'true' || !params.propertyId) {
+      setShowPropertyModal(false);
+      setSelectedProperty(null);
+    }
+  }, [params.openModal, params.propertyId]);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      setShowPropertyModal(false);
+      setSelectedProperty(null);
+    };
+  }, []);
+
+  // Function to manually close modal and clear parameters
+  const closeModalAndClearParams = () => {
+    setShowPropertyModal(false);
+    setSelectedProperty(null);
+    // Clear the URL parameters by navigating to the same route without params
+    router.replace('/(root)/(tabs)/explore');
+  };
+
   // Memoize the map region to prevent unnecessary re-renders
   const stableMapRegion = useMemo(() => {
     return mapRegion || {
@@ -337,18 +408,113 @@ const Explore = () => {
 
   // Filter properties that have valid coordinates - memoized to prevent unnecessary re-filtering
   const propertiesWithCoords = useMemo(() => {
-    return properties?.filter((property: any) => 
+    let filteredProperties = properties?.filter((property: any) => 
       property.latitude && 
       property.longitude && 
       property.latitude !== 0 && 
       property.longitude !== 0
     ) || [];
-  }, [properties]);
+
+    // If search location is set, filter by distance
+    if (searchLocation) {
+      filteredProperties = filterPropertiesByDistance(
+        filteredProperties,
+        searchLocation.latitude,
+        searchLocation.longitude,
+        2.5 // 2.5km radius
+      );
+      
+      // Sort by distance (closest to farthest)
+      filteredProperties = filteredProperties.sort((a, b) => {
+        const distanceA = calculateDistance(
+          searchLocation.latitude,
+          searchLocation.longitude,
+          (a as any).latitude,
+          (a as any).longitude
+        );
+        const distanceB = calculateDistance(
+          searchLocation.latitude,
+          searchLocation.longitude,
+          (b as any).latitude,
+          (b as any).longitude
+        );
+        return distanceA - distanceB; // Closest first
+      });
+    }
+
+    return filteredProperties;
+  }, [properties, searchLocation]);
 
   // Handle property marker press
   const handlePropertyPress = (property: any) => {
     setSelectedProperty(property);
     setShowPropertyModal(true);
+  };
+
+  // Handle search input changes
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    
+    if (text.length >= 2) {
+      const suggestions = getSearchSuggestions(text);
+      setSearchSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+    } else {
+      setShowSuggestions(false);
+      setSearchSuggestions([]);
+    }
+  };
+
+  // Handle search submission
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setSearchLocation(null);
+      return;
+    }
+
+    const geocodeResult = await geocodeSearchTerm(searchQuery);
+    if (geocodeResult) {
+      setSearchLocation({
+        latitude: geocodeResult.latitude,
+        longitude: geocodeResult.longitude,
+        placeName: geocodeResult.placeName
+      });
+      setShowSuggestions(false);
+      
+      // Pan camera to the searched location
+      setMapRegion({
+        latitude: geocodeResult.latitude,
+        longitude: geocodeResult.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    } else {
+      // If no geocoding result, clear location and show all properties
+      setSearchLocation(null);
+    }
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionSelect = async (suggestion: string) => {
+    setSearchQuery(suggestion);
+    setShowSuggestions(false);
+    
+    const geocodeResult = await geocodeSearchTerm(suggestion);
+    if (geocodeResult) {
+      setSearchLocation({
+        latitude: geocodeResult.latitude,
+        longitude: geocodeResult.longitude,
+        placeName: geocodeResult.placeName
+      });
+      
+      // Pan camera to the searched location
+      setMapRegion({
+        latitude: geocodeResult.latitude,
+        longitude: geocodeResult.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    }
   };
 
   // Close property modal
@@ -365,6 +531,10 @@ const Explore = () => {
     lastLocationRef.current = null;
     lastLocationTimeRef.current = 0;
     setCurrentInstruction('Continue straight');
+    // Clear URL parameters if they exist
+    if (params.openModal === 'true') {
+      router.replace('/(root)/(tabs)/explore');
+    }
     setNextInstruction('');
     setShowNextInstruction(false);
     setEta('1 hr 13 min');
@@ -573,19 +743,6 @@ const Explore = () => {
     }
   };
 
-  // Calculate distance between two coordinates in kilometers
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Radius of the Earth in kilometers
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
-    return distance;
-  };
 
   // Calculate speed in km/h
   const calculateSpeed = (distance: number, timeDiff: number) => {
@@ -1001,26 +1158,73 @@ const Explore = () => {
         <>
           <View className="absolute top-14 left-5 right-5 z-50 flex-row items-center gap-2 mt-2">
             {/* Search Bar */}
-            <View className="flex-1 flex-row items-center mb-6 bg-white rounded-full shadow-lg">
-              <View className="flex-1 bg-white rounded-full px-3 py-3 mr-1">
-                <TextInput
-                  className="text-base font-rubik text-black-300"
-                  placeholder="Find something new"
-                  placeholderTextColor="#8c8e98"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
+            <View className="flex-1 mb-6 bg-white rounded-full shadow-lg">
+              <View className="flex-row items-center">
+                <View className="flex-1 bg-white rounded-full px-3 py-3 mr-1">
+                  <TextInput
+                    className="text-base font-rubik text-black-300"
+                    placeholder="Search malls, restaurants, schools..."
+                    placeholderTextColor="#8c8e98"
+                    value={searchQuery}
+                    onChangeText={handleSearchChange}
+                    onSubmitEditing={handleSearch}
+                    onFocus={() => {
+                      if (searchSuggestions.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                  />
+                </View>
+                <TouchableOpacity
+                  className="w-16 h-16 rounded-full items-center justify-center mr-2"
+                  style={{ backgroundColor: '#14b8a6' }}
+                  onPress={handleSearch}
+                >
+                  <Ionicons name="search" size={20} color="white" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                className="w-16 h-16 rounded-full items-center justify-center mr-2"
-                style={{ backgroundColor: '#14b8a6' }}
-                onPress={() => {
-                  // Search is handled automatically by debounced effect
-                }}
-              >
-                <Ionicons name="search" size={20} color="white" />
-              </TouchableOpacity>
             </View>
+
+            {/* Search Result Indicator */}
+            {searchLocation && (
+              <View className="absolute top-40 left-5 right-5 z-40">
+                <View className="bg-blue-50 rounded-lg p-3 flex-row items-center">
+                  <Ionicons name="location" size={20} color="#3B82F6" />
+                  <Text className="text-blue-600 font-rubik-medium ml-2">
+                    Showing properties within 2.5km of {searchLocation.placeName}
+                  </Text>
+                  <TouchableOpacity 
+                    className="ml-auto"
+                    onPress={() => {
+                      setSearchLocation(null);
+                      setSearchQuery('');
+                      setShowSuggestions(false);
+                    }}
+                  >
+                    <Ionicons name="close" size={20} color="#3B82F6" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Search Suggestions Overlay */}
+            {showSuggestions && searchSuggestions.length > 0 && (
+              <TouchableWithoutFeedback onPress={() => setShowSuggestions(false)}>
+                <View className="absolute inset-0 z-[9998]">
+                  <View className="absolute top-20 left-5 right-24 bg-white rounded-2xl shadow-lg z-[9999]">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        className="px-4 py-3 border-b border-gray-100"
+                        onPress={() => handleSuggestionSelect(suggestion)}
+                      >
+                        <Text className="text-gray-800 font-rubik">{suggestion}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+            )}
 
             {/* Rent/Buy Filter */}
               <TouchableOpacity

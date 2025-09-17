@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 
@@ -18,6 +19,7 @@ import Filters from "@/components/Filters";
 import images from "@/constants/images";
 
 import { getLatestProperties, getProperties } from "@/lib/appwrite";
+import { calculateDistance, filterPropertiesByDistance, geocodeSearchTerm, getSearchSuggestions } from "@/lib/geocoding";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
 import seed from "@/lib/seed";
@@ -29,6 +31,9 @@ const Home = () => {
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<'rent' | 'sell'>('sell');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isSeeding, setIsSeeding] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchLocation, setSearchLocation] = useState<{latitude: number, longitude: number, placeName: string} | null>(null);
   
   const { height: screenHeight } = Dimensions.get('window');
 
@@ -43,7 +48,7 @@ const Home = () => {
   });
 
   // Fetch properties for most popular section (sorted by rating)
-  const { data: popularProperties, loading: popularPropertiesLoading, refetch: refetchPopular } = useAppwrite({
+  const { data: allProperties, loading: popularPropertiesLoading, refetch: refetchPopular } = useAppwrite({
     fn: ({ filter, query, limit, propertyType }: { filter: string; query: string; limit: number; propertyType: string }) => 
       getProperties({
         filter,
@@ -54,10 +59,44 @@ const Home = () => {
     params: {
       filter: selectedCategory,
       query: "",
-      limit: 20,
+      limit: 100, // Get more properties for location filtering
       propertyType: propertyTypeFilter,
     },
   });
+
+  // Filter properties by location if search location is set
+  const popularProperties = useMemo(() => {
+    if (!searchLocation || !allProperties) {
+      return allProperties || [];
+    }
+    
+    // Filter properties within 2.5km radius
+    const nearbyProperties = filterPropertiesByDistance(
+      allProperties, 
+      searchLocation.latitude, 
+      searchLocation.longitude, 
+      2.5 // 2.5km radius
+    );
+    
+    // Sort by distance (closest to farthest)
+    const sortedProperties = nearbyProperties.sort((a, b) => {
+      const distanceA = calculateDistance(
+        searchLocation.latitude,
+        searchLocation.longitude,
+        a.latitude,
+        a.longitude
+      );
+      const distanceB = calculateDistance(
+        searchLocation.latitude,
+        searchLocation.longitude,
+        b.latitude,
+        b.longitude
+      );
+      return distanceA - distanceB; // Closest first
+    });
+    
+    return sortedProperties.slice(0, 20); // Limit to 20 properties
+  }, [allProperties, searchLocation]);
 
   // Debug logging
   console.log("Latest properties:", latestProperties?.length || 0);
@@ -65,6 +104,56 @@ const Home = () => {
 
   const handleCardPress = (id: string) => {
     router.push(`/properties/${id}`);
+  };
+
+  // Handle search input changes
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    
+    if (text.length >= 2) {
+      const suggestions = getSearchSuggestions(text);
+      setSearchSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+    } else {
+      setShowSuggestions(false);
+      setSearchSuggestions([]);
+    }
+  };
+
+  // Handle search submission
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setSearchLocation(null);
+      return;
+    }
+
+    const geocodeResult = await geocodeSearchTerm(searchQuery);
+    if (geocodeResult) {
+      setSearchLocation({
+        latitude: geocodeResult.latitude,
+        longitude: geocodeResult.longitude,
+        placeName: geocodeResult.placeName
+      });
+      setShowSuggestions(false);
+    } else {
+      // If no geocoding result, clear location and show all properties
+      setSearchLocation(null);
+    }
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionSelect = async (suggestion: string) => {
+    setSearchQuery(suggestion);
+    setShowSuggestions(false);
+    
+    const geocodeResult = await geocodeSearchTerm(suggestion);
+    if (geocodeResult) {
+      setSearchLocation({
+        latitude: geocodeResult.latitude,
+        longitude: geocodeResult.longitude,
+        placeName: geocodeResult.placeName
+      });
+    }
   };
 
   const formatPrice = (price: number) => {
@@ -151,19 +240,31 @@ const Home = () => {
 
           {/* Search Bar */}
           <View className="flex-row items-center gap-2">
-            <View className=" flex-1 flex-row items-center mb-6 bg-white rounded-full  shadow-md">
-              <View className="flex-1 bg-white rounded-full px-3 py-3  mr-1">
-                <TextInput
-                  className="text-base font-rubik text-black-300"
-                  placeholder="Find something new"
-                  placeholderTextColor="#8c8e98"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
+            <View className="flex-1 mb-6 bg-white rounded-full shadow-md">
+              <View className="flex-row items-center">
+                <View className="flex-1 bg-white rounded-full px-3 py-3 mr-1">
+                  <TextInput
+                    className="text-base font-rubik text-black-300"
+                    placeholder="Search malls, restaurants, schools..."
+                    placeholderTextColor="#8c8e98"
+                    value={searchQuery}
+                    onChangeText={handleSearchChange}
+                    onSubmitEditing={handleSearch}
+                    onFocus={() => {
+                      if (searchSuggestions.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                  />
+                </View>
+                <TouchableOpacity 
+                  className="w-16 h-16 rounded-full items-center justify-center mr-2" 
+                  style={{ backgroundColor: '#14b8a6' }}
+                  onPress={handleSearch}
+                >
+                  <Ionicons name="search" size={20} color="white" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity className="w-16 h-16 rounded-full items-center justify-center mr-2" style={{ backgroundColor: '#14b8a6' }}>
-                <Ionicons name="search" size={20} color="white" />
-              </TouchableOpacity>
             </View>
 
            
@@ -221,6 +322,47 @@ const Home = () => {
           </View>
         </View>
 
+        {/* Search Suggestions Overlay */}
+        {showSuggestions && searchSuggestions.length > 0 && (
+          <TouchableWithoutFeedback onPress={() => setShowSuggestions(false)}>
+            <View className="absolute inset-0 z-[9998]">
+              <View className="absolute top-44 left-4 right-24 bg-white rounded-2xl shadow-lg z-[9999]">
+                {searchSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    className="px-4 py-3 border-b border-gray-100"
+                    onPress={() => handleSuggestionSelect(suggestion)}
+                  >
+                    <Text className="text-gray-800 font-rubik">{suggestion}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        )}
+
+        {/* Search Result Indicator */}
+        {searchLocation && (
+          <View className="px-4 mb-4">
+            <View className="bg-blue-50 rounded-lg p-3 flex-row items-center">
+              <Ionicons name="location" size={20} color="#3B82F6" />
+              <Text className="text-blue-600 font-rubik-medium ml-2">
+                Showing properties within 2.5km of {searchLocation.placeName}
+              </Text>
+              <TouchableOpacity 
+                className="ml-auto"
+                onPress={() => {
+                  setSearchLocation(null);
+                  setSearchQuery('');
+                  setShowSuggestions(false);
+                }}
+              >
+                <Ionicons name="close" size={20} color="#3B82F6" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Properties Feed */}
         <View className="px-5">
           {latestPropertiesLoading ? (
@@ -228,9 +370,9 @@ const Home = () => {
               <ActivityIndicator size="large" color="#0061FF" />
               <Text className="text-sm font-rubik text-black-200 mt-2">Loading properties...</Text>
             </View>
-          ) : latestProperties && latestProperties.length > 0 ? (
+          ) : popularProperties && popularProperties.length > 0 ? (
             <View className="space-y-4">
-              {latestProperties.map((property: any) => (
+              {popularProperties.map((property: any) => (
                 <TouchableOpacity 
                   key={property.$id} 
                   className="mb-4"
@@ -287,7 +429,7 @@ const Home = () => {
                       </Text>
                       
                       {/* Property Features */}
-                      <View className="flex-row space-x- px-2 gap-2">
+                      <View className="flex-row space-x- px-2 gap-2 mb-2">
                         <View className="bg-gray-100 rounded-full px-3 py-1 flex-row items-center">
                           <Ionicons name="bed-outline" size={14} color="#666876" />
                           <Text className="text-sm font-rubik-medium text-gray-700 ml-1">
@@ -307,6 +449,23 @@ const Home = () => {
                           </Text>
                         </View>
                       </View>
+                      
+                      {/* Distance from searched location */}
+                      {searchLocation && (
+                        <View className="flex-row justify-end px-2">
+                          <View className="bg-blue-100 rounded-full px-3 py-1 flex-row items-center">
+                            <Ionicons name="location" size={14} color="#3B82F6" />
+                            <Text className="text-sm font-rubik-medium text-blue-600 ml-1">
+                              {calculateDistance(
+                                searchLocation.latitude,
+                                searchLocation.longitude,
+                                property.latitude,
+                                property.longitude
+                              ).toFixed(1)}km
+                            </Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </TouchableOpacity>
