@@ -11,8 +11,10 @@ import {
     View,
 } from "react-native";
 
-import { logout } from "@/lib/appwrite";
+import { getProperties, logout } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
+import { createImageSource } from "@/lib/imageUtils";
+import { useAppwrite } from "@/lib/useAppwrite";
 
 import icons from "@/constants/icons";
 import images from "@/constants/images";
@@ -55,6 +57,23 @@ const SettingsItem = ({
 
 const Profile = () => {
   const { user, refetch, loading } = useGlobalContext();
+
+  // Fetch user's posted properties
+  const { data: userProperties, loading: propertiesLoading } = useAppwrite({
+    fn: ({ filter, query, limit, propertyType }: { filter: string; query: string; limit: number; propertyType: string }) => 
+      getProperties({
+        filter,
+        query,
+        limit,
+        propertyType,
+      }),
+    params: {
+      filter: "All",
+      query: "",
+      limit: 20,
+      propertyType: "",
+    },
+  });
 
   const handleLogout = async () => {
     const result = await logout();
@@ -219,6 +238,120 @@ const Profile = () => {
               </View>
             </View>
           </View>
+        </View>
+
+        {/* My Posts Section */}
+        <View className="mt-8 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <View className="flex flex-row items-center justify-between mb-6">
+            <Text className="text-xl font-rubik-bold text-black-300">My Posts</Text>
+            <TouchableOpacity 
+              className="bg-primary-100 px-3 py-1 rounded-full"
+              onPress={() => router.push('/(root)/(tabs)/index')}
+            >
+              <Text className="text-sm font-rubik-medium text-primary-300">View All</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {propertiesLoading ? (
+            <View className="items-center py-8">
+              <Text className="text-base font-rubik text-black-200">Loading your posts...</Text>
+            </View>
+          ) : userProperties && userProperties.length > 0 ? (
+            <View className="space-y-4">
+              {userProperties.slice(0, 3).map((property: any) => (
+                <TouchableOpacity 
+                  key={property.$id} 
+                  className="bg-accent-50 rounded-xl p-4"
+                  onPress={() => router.push(`/properties/${property.$id}`)}
+                >
+                  <View className="flex-row items-center">
+                    {/* Property Image */}
+                    <View className="w-16 h-16 rounded-lg overflow-hidden mr-4">
+                      <Image
+                        source={createImageSource(
+                          property.images && property.images.length > 0 
+                            ? property.images[0] 
+                            : property.image, 
+                          images.newYork
+                        )}
+                        className="w-full h-full"
+                        resizeMode="cover"
+                      />
+                    </View>
+                    
+                    {/* Property Details */}
+                    <View className="flex-1">
+                      <Text className="text-base font-rubik-bold text-black-300 mb-1" numberOfLines={1}>
+                        {property.name || 'Property Name'}
+                      </Text>
+                      <Text className="text-sm font-rubik text-black-200 mb-2" numberOfLines={1}>
+                        {property.address || 'Address not specified'}
+                      </Text>
+                      
+                      {/* Property Features */}
+                      <View className="flex-row items-center gap-3">
+                        <View className="flex-row items-center">
+                          <Ionicons name="bed-outline" size={14} color="#666876" />
+                          <Text className="text-xs font-rubik-medium text-gray-700 ml-1">
+                            {property.bedrooms || 0}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center">
+                          <Ionicons name="water-outline" size={14} color="#666876" />
+                          <Text className="text-xs font-rubik-medium text-gray-700 ml-1">
+                            {property.bathrooms || 0}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center">
+                          <Ionicons name="resize-outline" size={14} color="#666876" />
+                          <Text className="text-xs font-rubik-medium text-gray-700 ml-1">
+                            {property.area || 0} sqft
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    
+                    {/* Price */}
+                    <View className="items-end">
+                      <Text className="text-lg font-rubik-bold text-black-300">
+                        ₱{property.price ? new Intl.NumberFormat('en-PH').format(property.price) : '0'}
+                      </Text>
+                      <Text className="text-xs font-rubik text-black-200 mt-1">
+                        {property.type || 'Property'}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+              
+              {userProperties.length > 3 && (
+                <TouchableOpacity 
+                  className="bg-primary-50 rounded-xl p-4 items-center"
+                  onPress={() => router.push('/(root)/(tabs)/index')}
+                >
+                  <Text className="text-primary-300 font-rubik-bold">
+                    View {userProperties.length - 3} more posts
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View className="items-center py-8">
+              <View className="w-16 h-16 bg-gray-100 rounded-full items-center justify-center mb-4">
+                <Ionicons name="home-outline" size={24} color="#666876" />
+              </View>
+              <Text className="text-base font-rubik-bold text-black-300 mb-2">No posts yet</Text>
+              <Text className="text-sm font-rubik text-black-200 text-center mb-4">
+                Start by creating your first property listing
+              </Text>
+              <TouchableOpacity 
+                className="bg-primary-300 px-6 py-3 rounded-full"
+                onPress={() => router.push('/(root)/(tabs)/index')}
+              >
+                <Text className="text-white font-rubik-bold">Create Post</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Quick Actions */}

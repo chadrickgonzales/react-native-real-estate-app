@@ -205,7 +205,8 @@ const Home = () => {
         {/* Header Section */}
         <View className="px-5 pt-5">
           {/* User Profile and Action Buttons */}
-          <View className="flex-row items-center justify-between mb-6">
+          <View className="relative flex-row items-center mb-6">
+            {/* Profile Picture - Left */}
             <View className="flex-row items-center">
               <Image
                 source={user?.avatar ? createImageSource(user.avatar) : images.avatar}
@@ -213,8 +214,8 @@ const Home = () => {
               />
             </View>
             
-            {/* Location */}
-            <View className="items-center">
+            {/* Location - Center */}
+            <View className="absolute left-0 right-0 items-center">
               <Text className="text-sm font-rubik text-gray-500 mb-1">Current location</Text>
               <View className="flex-row items-center">
                 <Ionicons name="location-outline" size={16} color="#191D31" />
@@ -222,15 +223,20 @@ const Home = () => {
               </View>
             </View>
 
-            {/* Action Buttons */}
-            <View className="flex-row items-center gap-2">
-              
-              
+            {/* Action Buttons - Right */}
+            <View className="flex-row items-center gap-4 ml-auto">
               {/* Notification Button */}
               <View className="p-2 bg-white rounded-full shadow-md">
                 <TouchableOpacity className="relative">
                   <Ionicons name="notifications-outline" size={24} color="#191D31" />
                   <View className="absolute -top-1 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Chat Button */}
+              <View className="p-2 bg-white rounded-full shadow-md">
+                <TouchableOpacity>
+                  <Ionicons name="chatbubble-outline" size={24} color="#191D31" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -448,11 +454,9 @@ const Home = () => {
                             {property.area || 0} Sqft
                           </Text>
                         </View>
-                      </View>
-                      
-                      {/* Distance from searched location */}
-                      {searchLocation && (
-                        <View className="flex-row justify-end px-2">
+                        
+                        {/* Distance from searched location */}
+                        {searchLocation && (
                           <View className="bg-blue-100 rounded-full px-3 py-1 flex-row items-center">
                             <Ionicons name="location" size={14} color="#3B82F6" />
                             <Text className="text-sm font-rubik-medium text-blue-600 ml-1">
@@ -464,8 +468,8 @@ const Home = () => {
                               ).toFixed(1)}km
                             </Text>
                           </View>
-                        </View>
-                      )}
+                        )}
+                      </View>
                     </View>
                   </View>
                 </TouchableOpacity>

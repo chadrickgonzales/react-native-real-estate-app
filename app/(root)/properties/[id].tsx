@@ -2,13 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
-    Dimensions,
-    FlatList,
-    Image,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  FlatList,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -22,6 +22,7 @@ const Property = () => {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [imageError, setImageError] = useState(false);
   const [currentImageIndex] = useState(0);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -59,7 +60,7 @@ const Property = () => {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+      <SafeAreaView className="flex-1 bg-gray-100 items-center justify-center">
         <Text className="text-gray-600 text-lg font-rubik">Loading property...</Text>
       </SafeAreaView>
     );
@@ -67,7 +68,7 @@ const Property = () => {
 
   if (!property) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+      <SafeAreaView className="flex-1 bg-gray-100 items-center justify-center">
         <Text className="text-gray-600 text-lg font-rubik">Property not found</Text>
         <TouchableOpacity 
           onPress={() => router.back()}
@@ -84,12 +85,20 @@ const Property = () => {
     : property.image;
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Decorative Arc Shape */}
+
      
-      
-      {/* Floating Navigation Buttons */}
-      <View className="absolute top-12 left-0 right-0 z-10 flex-row items-center justify-between px-4">
+    
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        className="flex-1 bg-gray-100"
+      >
+        {/* Hero Image Card */}
+        
+        {/* Property Details Card */}
+        <View>
+          <View className="bg-white mb-1 shadow-lg p-6">
+              {/* Floating Navigation Buttons */}
+      <View className="bg-white absolute top-12 left-0 right-0 z-10 flex-row items-center justify-between px-4">
         <TouchableOpacity
           onPress={() => router.back()}
           className="w-10 h-10 rounded-full bg-white items-center justify-center shadow-md"
@@ -101,12 +110,7 @@ const Property = () => {
           <Ionicons name="ellipsis-vertical" size={20} color="#374151" />
         </TouchableOpacity>
       </View>
-
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        className="flex-1"
-      >
-        {/* Hero Image Card */}
+            {/* Hero Image Card */}
         <View className="mx-6 mt-20 mb-6">
           <View className="bg-white rounded-3xl  overflow-hidden" style={{ height: windowHeight * 0.4, backgroundColor: '#FFFFFF' }}>
             <View className="relative">
@@ -182,47 +186,71 @@ const Property = () => {
             )}
           </View>
         </View>
-
-        {/* Property Details Card */}
-        <View className=" mb-6">
-          <View className="bg-white rounded-3xl shadow-lg p-6">
-              {/* Title and Rating */}
-              <View className="flex-row items-center justify-between mb-3">
-                <Text className="text-2xl font-rubik-bold text-gray-900 flex-1">
+            
+              {/* Title */}
+              <View className="mb-3">
+                <Text className="text-2xl font-rubik-bold text-gray-900">
                   {property.name || `${getPropertyTypeDisplay()} ${getLocationFromAddress(property.address)}`}
                 </Text>
-                <View className="flex-row items-center">
-                  <Ionicons name="star" size={16} color="#F59E0B" />
-                  <Text className="text-gray-600 font-rubik-medium ml-1">
-                    {property.rating || '4.5'}
-                  </Text>
-                </View>
               </View>
 
-            {/* Location and Price */}
-            <View className="flex-row items-center justify-between mb-6">
-              <View className="flex-row items-center flex-1">
-                <Ionicons name="location-outline" size={16} color="#6B7280" />
-                <Text className="text-gray-600 font-rubik ml-2 flex-1" numberOfLines={1}>
-                  {property.address || 'Address not specified'}
-                </Text>
-              </View>
-              <Text className="text-2xl font-rubik-bold text-gray-900">
+            {/* Location */}
+            <View className="flex-row items-center mb-3">
+              <Ionicons name="location-outline" size={16} color="#6B7280" />
+              <Text className="text-gray-600 font-rubik ml-1 flex-1" numberOfLines={1}>
+                {property.address || 'Address not specified'}
+              </Text>
+            </View>
+
+            {/* Price */}
+            <View className="mb-3 ml-2">
+              <Text className="text-gray-600 font-rubik">
                 {formatPrice(property.price)}
               </Text>
+            </View>
+
+            {/* Message Section */}
+            <View className="mb-6 bg-white rounded-2xl p-4 border border-gray-200">
+              {/* Send Message Header */}
+              <View className="flex-row items-center mb-4">
+                <Text className="text-black font-rubik-medium text-base">Send seller a message</Text>
+              </View>
+              
+              {/* Message Input */}
+              <View className="flex-row items-center mb-6">
+                <View className="flex-1 bg-gray-100 rounded-full px-4 py-4 mr-3">
+                  <Text className="text-gray-400 font-rubik text-base">Is this still available?</Text>
+                </View>
+                <TouchableOpacity className="bg-blue-500 px-6 py-4 rounded-full">
+                  <Text className="text-white font-rubik-bold text-base">Send</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Description */}
             <View className="mb-6">
               <Text className="text-lg font-rubik-bold text-gray-900 mb-3">Description</Text>
-              <Text className="text-gray-600 font-rubik leading-6">
+              <Text 
+                className="text-gray-600 font-rubik leading-6"
+                numberOfLines={showFullDescription ? undefined : 3}
+              >
                 {property.description || 'This exquisitely engineered property is a masterpiece of superior craftsmanship and modern design.'}
-                {property.description && property.description.length > 100 && (
-                  <Text className="text-blue-600 font-rubik-medium"> more</Text>
-                )}
               </Text>
+              {property.description && property.description.length > 150 && (
+                <TouchableOpacity 
+                  onPress={() => setShowFullDescription(!showFullDescription)}
+                  className="mt-2"
+                >
+                  <Text className="text-blue-600 font-rubik-medium">
+                    {showFullDescription ? 'Show less' : 'Show more'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
+          </View>
+          
+          <View className="bg-white mb-1 shadow-lg p-6">
             {/* Facilities */}
             <View className="mb-4">
               <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Facilities</Text>
@@ -398,7 +426,10 @@ const Property = () => {
                 <Text className="text-gray-600 font-rubik leading-6">{property.amenities}</Text>
               </View>
             )}
+          </View>
 
+
+          <View className="bg-white shadow-lg p-6">
             {/* Contact Information */}
             <View className="mb-6">
               <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Contact Information</Text>
@@ -421,15 +452,7 @@ const Property = () => {
                 )}
               </View>
             </View>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Bottom Action Buttons */}
-      <View className="px-4 py-2 bg-white">
-        <View className="bg-white p-4">
-          {/* Explore Similar Properties Button */}
-          <TouchableOpacity 
+            <TouchableOpacity 
             className="bg-purple-100 py-4 rounded-full flex-row items-center justify-center mb-4"
             onPress={() => {
               router.push({
@@ -445,23 +468,12 @@ const Property = () => {
             }}
           >
             <Ionicons name="map-outline" size={20} color="#8B5CF6" />
-            <Text className="text-purple-600 font-rubik-bold ml-2">Explore Similar Properties</Text>
+            <Text className="text-purple-600 font-rubik-bold ml-2">Explore The Property</Text>
           </TouchableOpacity>
-          
-          <View className="flex-row gap-4">
-            <TouchableOpacity className="flex-1 bg-blue-100 py-4 rounded-full flex-row items-center justify-center">
-              <Ionicons name="chatbubble-outline" size={20} color="#3B82F6" />
-              <Text className="text-blue-600 font-rubik-bold ml-2">Message</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity className="flex-1 bg-teal-500 py-4 rounded-full flex-row items-center justify-center">
-              <Ionicons name="call-outline" size={20} color="white" />
-              <Text className="text-white font-rubik-bold ml-2">Call Now</Text>
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+
   );
 };
 
