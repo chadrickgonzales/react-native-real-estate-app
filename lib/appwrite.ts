@@ -1,14 +1,14 @@
 import * as Linking from "expo-linking";
 import { openAuthSessionAsync } from "expo-web-browser";
 import {
-  Account,
-  Avatars,
-  Client,
-  Databases,
-  ID,
-  OAuthProvider,
-  Query,
-  Storage
+    Account,
+    Avatars,
+    Client,
+    Databases,
+    ID,
+    OAuthProvider,
+    Query,
+    Storage
 } from "react-native-appwrite";
 
 export const config = {
@@ -383,14 +383,8 @@ export async function getProperties({
     if (propertyType && propertyType !== '')
       buildQuery.push(Query.equal("propertyType", propertyType));
 
-    if (query)
-      buildQuery.push(
-        Query.or([
-          Query.search("name", query),
-          Query.search("address", query),
-          Query.search("type", query),
-        ])
-      );
+    // Note: Search functionality is now handled client-side using geocoding utility
+    // This avoids the need for fulltext indexes in Appwrite
 
     if (limit) buildQuery.push(Query.limit(limit));
 
