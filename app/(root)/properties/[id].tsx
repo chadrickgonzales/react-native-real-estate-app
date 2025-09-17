@@ -5,6 +5,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Modal,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -23,8 +24,190 @@ const Property = () => {
   const [imageError, setImageError] = useState(false);
   const [currentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<number | null>(null);
+  const [showTimeSlots, setShowTimeSlots] = useState(false);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
+  const [showBookingConfirmation, setShowBookingConfirmation] = useState(false);
 
   const windowHeight = Dimensions.get("window").height;
+
+  // Calendar helper functions
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    return { daysInMonth, startingDayOfWeek };
+  };
+
+  const generateCalendarDays = (date: Date) => {
+    const { daysInMonth, startingDayOfWeek } = getDaysInMonth(date);
+    const days = [];
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(day);
+    }
+    
+    return days;
+  };
+
+  const isDateAvailable = (day: number, month: Date) => {
+    if (!day) return false;
+    
+    const date = new Date(month.getFullYear(), month.getMonth(), day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // For staycation properties (Villa/Townhomes), check availability
+    if (property?.propertyType === 'rent' && (property.type === 'Villa' || property.type === 'Townhomes')) {
+      // More realistic booking pattern for staycation properties
+      // Weekends (Fri-Sun) are more likely to be booked
+      const dayOfWeek = date.getDay();
+      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0; // Fri, Sat, Sun
+      
+      // Simulate higher booking rates on weekends
+      const random = (date.getTime() + day) % 10;
+      if (isWeekend) {
+        return random >= 3; // 70% chance available on weekends
+      } else {
+        return random >= 1; // 90% chance available on weekdays
+      }
+    }
+    
+    // For sale properties, check viewing availability
+    if (property?.propertyType === 'sell') {
+      const dayOfWeek = date.getDay();
+      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0; // Fri, Sat, Sun
+      
+      // For viewing appointments, most days have multiple slots available
+      // Only mark as unavailable if the day is completely booked or blocked
+      const random = (date.getTime() + day) % 10;
+      if (isWeekend) {
+        return random >= 1; // 90% chance has available viewing slots on weekends
+      } else {
+        return random >= 2; // 80% chance has available viewing slots on weekdays
+      }
+    }
+    
+    return date >= today;
+  };
+
+  const isDateBooked = (day: number, month: Date) => {
+    if (!day) return false;
+    
+    const date = new Date(month.getFullYear(), month.getMonth(), day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // For staycation properties, simulate realistic booking patterns
+    if (property?.propertyType === 'rent' && (property.type === 'Villa' || property.type === 'Townhomes')) {
+      const dayOfWeek = date.getDay();
+      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0; // Fri, Sat, Sun
+      
+      const random = (date.getTime() + day) % 10;
+      if (isWeekend) {
+        return random < 3; // 30% chance booked on weekends
+      } else {
+        return random < 1; // 10% chance booked on weekdays
+      }
+    }
+    
+    // For sale properties, simulate viewing appointments
+    if (property?.propertyType === 'sell') {
+      const dayOfWeek = date.getDay();
+      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0; // Fri, Sat, Sun
+      
+      // Only mark as "booked" if the day is completely unavailable (rare)
+      // Most days will have some viewing slots available
+      const random = (date.getTime() + day) % 10;
+      if (isWeekend) {
+        return random < 1; // 10% chance completely booked on weekends
+      } else {
+        return random < 2; // 20% chance completely booked on weekdays
+      }
+    }
+    
+    return false;
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    const newMonth = new Date(currentMonth);
+    if (direction === 'prev') {
+      newMonth.setMonth(newMonth.getMonth() - 1);
+    } else {
+      newMonth.setMonth(newMonth.getMonth() + 1);
+    }
+    setCurrentMonth(newMonth);
+  };
+
+  const generateTimeSlots = (day: number) => {
+    const timeSlots = [];
+    const startHour = 9; // 9 AM
+    const endHour = 17; // 5 PM
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      // Generate 2 slots per hour (30 minutes each)
+      timeSlots.push({
+        time: `${hour.toString().padStart(2, '0')}:00`,
+        available: Math.random() > 0.3, // 70% chance available
+        id: `${day}-${hour}-00`
+      });
+      timeSlots.push({
+        time: `${hour.toString().padStart(2, '0')}:30`,
+        available: Math.random() > 0.3, // 70% chance available
+        id: `${day}-${hour}-30`
+      });
+    }
+    
+    return timeSlots;
+  };
+
+  const handleDateClick = (day: number) => {
+    if (isDateAvailable(day, currentMonth) && !isDateBooked(day, currentMonth)) {
+      setSelectedDate(day);
+      setShowTimeSlots(true);
+    }
+  };
+
+  const closeTimeSlots = () => {
+    setShowTimeSlots(false);
+    setSelectedDate(null);
+    setSelectedTimeSlot(null);
+  };
+
+  const handleTimeSlotSelect = (timeSlot: string) => {
+    setSelectedTimeSlot(timeSlot);
+    setShowTimeSlots(false);
+    setShowBookingConfirmation(true);
+  };
+
+  const confirmBooking = () => {
+    // Here you would typically make an API call to book the appointment
+    // For now, we'll just show a success message and close the modal
+    alert(`Viewing appointment confirmed!\n\nProperty: ${property?.name || 'Property'}\nDate: ${currentMonth.toLocaleDateString('en-US', { month: 'long' })} ${selectedDate}, ${currentMonth.getFullYear()}\nTime: ${selectedTimeSlot}\n\nYou will receive a confirmation email shortly.`);
+    
+    // Close all modals and reset state
+    setShowBookingConfirmation(false);
+    setSelectedTimeSlot(null);
+    setSelectedDate(null);
+  };
+
+  const cancelBooking = () => {
+    setShowBookingConfirmation(false);
+    setSelectedTimeSlot(null);
+    // Return to time slots selection
+    setShowTimeSlots(true);
+  };
 
   const { data: property, loading } = useAppwrite({
     fn: getPropertyById,
@@ -85,9 +268,7 @@ const Property = () => {
     : property.image;
 
   return (
-
-     
-    
+    <View className="flex-1">
       <ScrollView 
         showsVerticalScrollIndicator={false}
         className="flex-1 bg-gray-100"
@@ -249,6 +430,281 @@ const Property = () => {
             </View>
 
           </View>
+          
+          {/* Availability Calendar - Only for staycation-friendly rental properties */}
+          {property.propertyType === 'rent' && (property.type === 'Villa' || property.type === 'Townhomes') && (
+            <View className="bg-white mb-1 shadow-lg p-6">
+              <View className="mb-4">
+                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability for Booking</Text>
+                
+                {/* Calendar Header */}
+                <View className="flex-row items-center justify-between mb-4">
+                  <TouchableOpacity 
+                    onPress={() => navigateMonth('prev')}
+                    className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center"
+                  >
+                    <Ionicons name="chevron-back" size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                  
+                  <Text className="text-gray-900 font-rubik-bold text-lg">
+                    {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </Text>
+                  
+                  <TouchableOpacity 
+                    onPress={() => navigateMonth('next')}
+                    className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center"
+                  >
+                    <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Calendar Grid */}
+                <View className="bg-gray-50 rounded-lg p-3">
+                  {/* Day Headers */}
+                  <View className="flex-row mb-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                      <View key={day} className="flex-1 items-center py-2">
+                        <Text className="text-gray-500 font-rubik-medium text-xs">{day}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Calendar Days */}
+                  <View className="flex-row flex-wrap">
+                    {generateCalendarDays(currentMonth).map((day, index) => (
+                      <View key={index} className="w-[14.28%] aspect-square items-center justify-center">
+                        {day ? (
+                          <View className={`w-8 h-8 rounded-full items-center justify-center ${
+                            isDateBooked(day, currentMonth) 
+                              ? 'bg-red-100' 
+                              : 'bg-green-100'
+                          }`}>
+                            <Text className={`font-rubik text-sm ${
+                              isDateBooked(day, currentMonth) 
+                                ? 'text-red-600' 
+                                : 'text-green-600'
+                            }`}>
+                              {day}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View className="w-8 h-8" />
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Legend */}
+                <View className="flex-row justify-center mt-4 space-x-8">
+                  <View className="flex-row items-center">
+                    <View className="w-3 h-3 bg-green-100 rounded-full mr-2" />
+                    <Text className="text-gray-600 font-rubik text-xs">Available</Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <View className="w-3 h-3 bg-red-100 rounded-full mr-2" />
+                    <Text className="text-gray-600 font-rubik text-xs">Booked</Text>
+                  </View>
+                </View>
+
+                {/* Staycation Info */}
+                <View className="mt-4 p-3 bg-purple-50 rounded-lg">
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="home" size={16} color="#8B5CF6" />
+                    <Text className="text-purple-600 font-rubik-medium ml-2 text-sm">Perfect for Staycation</Text>
+                  </View>
+                  <Text className="text-gray-600 font-rubik text-sm mb-2">
+                    {property.type} - Ideal for weekend getaways, family vacations, and tourist stays
+                  </Text>
+                  <View className="flex-row items-center">
+                    <Ionicons name="calendar" size={14} color="#8B5CF6" />
+                    <Text className="text-gray-600 font-rubik text-xs ml-2">
+                      Minimum stay: 2 nights • Perfect for tourists & weekend trips
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Availability for Viewing - For sale properties */}
+          {property.propertyType === 'sell' && (
+            <View className="bg-white mb-1 shadow-lg p-6">
+              <View className="mb-4">
+                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability for Viewing</Text>
+                
+                {/* Calendar Header */}
+                <View className="flex-row items-center justify-between mb-4">
+                  <TouchableOpacity 
+                    onPress={() => navigateMonth('prev')}
+                    className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center"
+                  >
+                    <Ionicons name="chevron-back" size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                  
+                  <Text className="text-gray-900 font-rubik-bold text-lg">
+                    {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </Text>
+                  
+                  <TouchableOpacity 
+                    onPress={() => navigateMonth('next')}
+                    className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center"
+                  >
+                    <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Calendar Grid */}
+                <View className="bg-gray-50 rounded-lg p-3">
+                  {/* Day Headers */}
+                  <View className="flex-row mb-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                      <View key={day} className="flex-1 items-center py-2">
+                        <Text className="text-gray-500 font-rubik-medium text-xs">{day}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Calendar Days */}
+                  <View className="flex-row flex-wrap">
+                    {generateCalendarDays(currentMonth).map((day, index) => (
+                      <View key={index} className="w-[14.28%] aspect-square items-center justify-center">
+                        {day ? (
+                          <TouchableOpacity 
+                            onPress={() => handleDateClick(day)}
+                            className={`w-8 h-8 rounded-full items-center justify-center ${
+                              isDateBooked(day, currentMonth) 
+                                ? 'bg-red-100' 
+                                : 'bg-green-100'
+                            }`}
+                            disabled={isDateBooked(day, currentMonth)}
+                          >
+                            <Text className={`font-rubik text-sm ${
+                              isDateBooked(day, currentMonth) 
+                                ? 'text-red-600' 
+                                : 'text-green-600'
+                            }`}>
+                              {day}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View className="w-8 h-8" />
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Legend */}
+                <View className="flex-row justify-center mt-4 gap-4">
+                  <View className="flex-row items-center">
+                    <View className="w-3 h-3 bg-green-100 rounded-full mr-2" />
+                    <Text className="text-gray-600 font-rubik text-xs">Available for Viewing</Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <View className="w-3 h-3 bg-red-100 rounded-full mr-2" />
+                    <Text className="text-gray-600 font-rubik text-xs">Viewing Booked</Text>
+                  </View>
+                </View>
+
+                {/* Viewing Info */}
+                <View className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="eye" size={16} color="#3B82F6" />
+                    <Text className="text-blue-600 font-rubik-medium ml-2 text-sm">Property Viewing</Text>
+                  </View>
+                  <Text className="text-gray-600 font-rubik text-sm mb-2">
+                    Schedule a viewing appointment to see this {property.type} in person
+                  </Text>
+                  <View className="flex-row items-center mb-1">
+                    <Ionicons name="time" size={14} color="#3B82F6" />
+                    <Text className="text-gray-600 font-rubik text-xs ml-2">
+                      Multiple time slots available per day (30-60 min each)
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <Ionicons name="information-circle" size={14} color="#3B82F6" />
+                    <Text className="text-gray-600 font-rubik text-xs ml-2">
+                      Green = Has available slots • Red = Fully booked day
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+
+          {/* Basic Availability Info - For other rental properties */}
+          {property.propertyType === 'rent' && property.type !== 'Villa' && property.type !== 'Townhomes' && (
+            <View className="bg-white mb-1 shadow-lg p-6">
+              <View className="mb-4">
+                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability</Text>
+                
+                {/* Available Date */}
+                <View className="flex-row items-center mb-4">
+                  <View className="w-10 h-10 bg-green-100 rounded-full items-center justify-center mr-3">
+                    <Ionicons name="calendar-outline" size={20} color="#10B981" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-gray-900 font-rubik-medium text-base">Available From</Text>
+                    <Text className="text-gray-600 font-rubik">
+                      {property.availableDate 
+                        ? new Date(property.availableDate).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })
+                        : 'Available Now'
+                      }
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Rental Type */}
+                <View className="flex-row items-center mb-4">
+                  <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center mr-3">
+                    <Ionicons name="home-outline" size={20} color="#3B82F6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-gray-900 font-rubik-medium text-base">Rental Type</Text>
+                    <Text className="text-gray-600 font-rubik">
+                      {property.furnishedStatus 
+                        ? 'Furnished - Perfect for Tourists & Staycation' 
+                        : 'Unfurnished - Long-term Rental'
+                      }
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Minimum Stay */}
+                <View className="flex-row items-center mb-4">
+                  <View className="w-10 h-10 bg-purple-100 rounded-full items-center justify-center mr-3">
+                    <Ionicons name="time-outline" size={20} color="#8B5CF6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-gray-900 font-rubik-medium text-base">Minimum Stay</Text>
+                    <Text className="text-gray-600 font-rubik">
+                      {property.furnishedStatus ? '2 nights minimum' : '6 months minimum'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Booking Status */}
+                <View className="flex-row items-center">
+                  <View className="w-10 h-10 bg-orange-100 rounded-full items-center justify-center mr-3">
+                    <Ionicons name="checkmark-circle-outline" size={20} color="#F59E0B" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-gray-900 font-rubik-medium text-base">Booking Status</Text>
+                    <Text className="text-green-600 font-rubik-medium">
+                      Available for Booking
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
           
           <View className="bg-white mb-1 shadow-lg p-6">
             {/* Facilities */}
@@ -474,6 +930,151 @@ const Property = () => {
         </View>
       </ScrollView>
 
+      {/* Time Slots Popup Modal */}
+      <Modal
+        visible={showTimeSlots}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeTimeSlots}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center px-4">
+          <View className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-rubik-bold text-gray-900">
+                Available Time Slots
+              </Text>
+              <TouchableOpacity onPress={closeTimeSlots}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text className="text-gray-600 font-rubik mb-4">
+              {currentMonth.toLocaleDateString('en-US', { month: 'long' })} {selectedDate}, {currentMonth.getFullYear()}
+            </Text>
+
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {selectedDate && generateTimeSlots(selectedDate).map((slot) => (
+                <TouchableOpacity
+                  key={slot.id}
+                  onPress={() => slot.available && handleTimeSlotSelect(slot.time)}
+                  className={`px-4 py-2 rounded-lg border ${
+                    slot.available 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
+                  disabled={!slot.available}
+                >
+                  <Text className={`font-rubik text-sm ${
+                    slot.available 
+                      ? 'text-green-700' 
+                      : 'text-gray-400'
+                  }`}>
+                    {slot.time}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View className="p-3 bg-blue-50 rounded-lg">
+              <View className="flex-row items-center">
+                <Ionicons name="information-circle" size={16} color="#3B82F6" />
+                <Text className="text-blue-600 font-rubik-medium ml-2 text-sm">Booking Info</Text>
+              </View>
+              <Text className="text-gray-600 font-rubik text-xs mt-1">
+                Tap on an available time slot to book your viewing appointment
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Booking Confirmation Modal */}
+      <Modal
+        visible={showBookingConfirmation}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelBooking}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center px-4">
+          <View className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-rubik-bold text-gray-900">
+                Confirm Viewing Appointment
+              </Text>
+              <TouchableOpacity onPress={cancelBooking}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Property Info */}
+            <View className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <Text className="text-gray-900 font-rubik-bold text-base mb-1">
+                {property?.name || 'Property'}
+              </Text>
+              <Text className="text-gray-600 font-rubik text-sm">
+                {property?.address || 'Address not specified'}
+              </Text>
+            </View>
+
+            {/* Appointment Details */}
+            <View className="mb-4">
+              <Text className="text-gray-900 font-rubik-bold text-base mb-3">Appointment Details</Text>
+              
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="calendar" size={16} color="#3B82F6" />
+                <Text className="text-gray-600 font-rubik ml-2">
+                  {currentMonth.toLocaleDateString('en-US', { 
+                    weekday: 'long',
+                    month: 'long', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </Text>
+              </View>
+              
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="time" size={16} color="#3B82F6" />
+                <Text className="text-gray-600 font-rubik ml-2">
+                  {selectedTimeSlot} (30-60 minutes)
+                </Text>
+              </View>
+              
+              <View className="flex-row items-center">
+                <Ionicons name="person" size={16} color="#3B82F6" />
+                <Text className="text-gray-600 font-rubik ml-2">
+                  Property viewing appointment
+                </Text>
+              </View>
+            </View>
+
+            {/* Contact Info */}
+            <View className="mb-6 p-3 bg-blue-50 rounded-lg">
+              <Text className="text-blue-600 font-rubik-bold text-sm mb-1">Contact Information</Text>
+              <Text className="text-gray-600 font-rubik text-xs">
+                You will receive a confirmation email with property details and contact information.
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View className="flex-row gap-3">
+              <TouchableOpacity 
+                onPress={cancelBooking}
+                className="flex-1 py-3 px-4 bg-gray-100 rounded-lg"
+              >
+                <Text className="text-gray-600 font-rubik-bold text-center">Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                onPress={confirmBooking}
+                className="flex-1 py-3 px-4 bg-blue-500 rounded-lg"
+              >
+                <Text className="text-white font-rubik-bold text-center">Confirm Booking</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
