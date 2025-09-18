@@ -40,7 +40,7 @@ export const useAppwrite = <T, P extends Record<string, string | number>>({
         setLoading(false);
       }
     },
-    [fn]
+    [] // Removed fn from dependencies to prevent infinite loops
   );
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export const useAppwrite = <T, P extends Record<string, string | number>>({
       fetchData(params);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [skip, ...Object.values(params)]);
 
   const refetch = async (newParams: P) => await fetchData(newParams);
 

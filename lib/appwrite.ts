@@ -13,17 +13,19 @@ import {
 
 export const config = {
   platform: "com.jsm.restate",
-  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
-  projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
-  databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
+  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || "https://syd.cloud.appwrite.io/v1",
+  projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID || "68bfc67b000f0d9a493c",
+  databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID || "68c114a1000e22edecff",
   galleriesCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_GALLERIES_COLLECTION_ID,
-  reviewsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_REVIEWS_COLLECTION_ID,
-  agentsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AGENTS_COLLECTION_ID,
+    process.env.EXPO_PUBLIC_APPWRITE_GALLERIES_COLLECTION_ID || "galleries",
+  reviewsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_REVIEWS_COLLECTION_ID || "reviews",
+  agentsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AGENTS_COLLECTION_ID || "agents",
   propertiesCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID,
-  usersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID,
-  bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID,
+    process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID || "properties",
+  usersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID || "user",
+  chatsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CHATS_COLLECTION_ID || "chats",
+  messagesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID || "messages",
+  bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID || "68c4f43100080f6b0d50",
 };
 
 export const client = new Client();
@@ -803,6 +805,7 @@ export async function createProperty(propertyData: any) {
         amenities: propertyData.amenities || "",
         latitude: propertyData.latitude || 0,
         longitude: propertyData.longitude || 0,
+        propertyOwnerId: currentUser.$id, // Set the current user as the property owner
       }
     );
 
@@ -816,4 +819,359 @@ export async function createProperty(propertyData: any) {
     });
     throw error;
   }
+}
+
+// Chat functionality
+export interface Chat {
+  $id: string;
+  propertyId: string;
+  buyerId: string;
+  sellerId: string;
+  propertyName: string;
+  propertyAddress?: string;
+  sellerName: string;
+  sellerAvatar?: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Message {
+  $id: string;
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  text: string;
+  timestamp: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+// Create or get existing chat between buyer and seller for a property
+export async function createOrGetChat({
+  propertyId,
+  buyerId,
+  sellerId,
+  propertyName,
+  sellerName,
+  sellerAvatar,
+  initialMessage,
+}: {
+  propertyId: string;
+  buyerId: string;
+  sellerId: string;
+  propertyName: string;
+  sellerName: string;
+  sellerAvatar?: string;
+  initialMessage?: string;
+}) {
+  try {
+
+    // Get property details to extract address
+    let propertyAddress = "Location";
+    try {
+      const property = await databases.getDocument(
+        config.databaseId!,
+        config.propertiesCollectionId!,
+        propertyId
+      );
+      propertyAddress = property.address || "Location";
+    } catch (error) {
+      console.warn("Could not fetch property address:", error);
+    }
+
+    // Check if chat already exists
+    const existingChats = await databases.listDocuments(
+      config.databaseId!,
+      config.chatsCollectionId!,
+      [
+        Query.equal("propertyId", propertyId),
+        Query.equal("buyerId", buyerId),
+        Query.equal("sellerId", sellerId),
+      ]
+    );
+
+    let chat: Chat;
+    
+    if (existingChats.documents.length > 0) {
+      // Chat exists, return it
+      chat = existingChats.documents[0] as Chat;
+    } else {
+      // Create new chat
+      const newChat = await databases.createDocument(
+        config.databaseId!,
+        config.chatsCollectionId!,
+        ID.unique(),
+        {
+          propertyId,
+          buyerId,
+          sellerId,
+          propertyName,
+          sellerName,
+          sellerAvatar: sellerAvatar || "",
+          propertyAddress, // Add property address
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      );
+      chat = newChat as Chat;
+    }
+
+    // If there's an initial message, send it
+    if (initialMessage && initialMessage.trim()) {
+      await sendMessage({
+        chatId: chat.$id,
+        senderId: buyerId,
+        senderName: "You", // This will be replaced with actual user name
+        text: initialMessage.trim(),
+      });
+    }
+
+    return chat;
+  } catch (error: any) {
+    console.error("Error creating or getting chat:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+    });
+    throw error;
+  }
+}
+
+// Send a message in a chat
+export async function sendMessage({
+  chatId,
+  senderId,
+  senderName,
+  senderAvatar,
+  text,
+}: {
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  text: string;
+}) {
+  try {
+
+    // Check if message collection is configured
+    if (!config.messagesCollectionId) {
+      console.warn("Message collection not configured. Please run setup-chat.js to configure chat functionality.");
+      return null;
+    }
+
+    // Create the message
+    const message = await databases.createDocument(
+      config.databaseId!,
+      config.messagesCollectionId!,
+      ID.unique(),
+      {
+        chatId,
+        senderId,
+        senderName,
+        senderAvatar: senderAvatar || "",
+        text: text.trim(),
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      }
+    );
+
+    // Update chat with last message info
+    await databases.updateDocument(
+      config.databaseId!,
+      config.chatsCollectionId!,
+      chatId,
+      {
+        lastMessage: text.trim(),
+        lastMessageTime: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+    );
+
+    return message as Message;
+  } catch (error: any) {
+    console.error("Error sending message:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+    });
+    throw error;
+  }
+}
+
+// Get messages for a specific chat
+export async function getMessages(chatId: string) {
+  try {
+
+    // Check if message collection is configured
+    if (!config.messagesCollectionId) {
+      console.warn("Message collection not configured. Please run setup-chat.js to configure chat functionality.");
+      return [];
+    }
+
+    const messages = await databases.listDocuments(
+      config.databaseId!,
+      config.messagesCollectionId!,
+      [
+        Query.equal("chatId", chatId),
+        Query.orderAsc("timestamp"),
+      ]
+    );
+
+    return messages.documents as Message[];
+  } catch (error: any) {
+    console.error("Error getting messages:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+    });
+    return [];
+  }
+}
+
+// Get all chats for a user (as buyer or seller)
+export async function getUserChats(userId: string) {
+  try {
+
+    // Check if chat collection is configured
+    if (!config.chatsCollectionId) {
+      console.warn("Chat collection not configured. Please run setup-chat.js to configure chat functionality.");
+      return [];
+    }
+
+    // Check if userId is valid
+    if (!userId || userId.trim() === "") {
+      console.warn("Invalid userId provided:", userId);
+      return [];
+    }
+
+    const chats = await databases.listDocuments(
+      config.databaseId!,
+      config.chatsCollectionId!,
+      [
+        Query.or([
+          Query.equal("buyerId", userId),
+          Query.equal("sellerId", userId),
+        ]),
+      ]
+    );
+
+    return chats.documents as Chat[];
+  } catch (error: any) {
+    console.error("Error getting user chats:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+    });
+    return [];
+  }
+}
+
+// Mark messages as read
+export async function markMessagesAsRead(chatId: string, userId: string) {
+  try {
+
+    // Check if message collection is configured
+    if (!config.messagesCollectionId) {
+      console.warn("Message collection not configured. Please run setup-chat.js to configure chat functionality.");
+      return;
+    }
+
+    // Get unread messages from other users
+    const unreadMessages = await databases.listDocuments(
+      config.databaseId!,
+      config.messagesCollectionId!,
+      [
+        Query.equal("chatId", chatId),
+        Query.notEqual("senderId", userId),
+        Query.equal("isRead", false),
+      ]
+    );
+
+    // Mark each message as read
+    const updatePromises = unreadMessages.documents.map(message =>
+      databases.updateDocument(
+        config.databaseId!,
+        config.messagesCollectionId!,
+        message.$id,
+        { isRead: true }
+      )
+    );
+
+    await Promise.all(updatePromises);
+  } catch (error: any) {
+    console.error("Error marking messages as read:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+    });
+  }
+}
+
+// Get property owner/seller ID from property
+export async function getPropertyOwner(propertyId: string) {
+  try {
+    const property = await databases.getDocument(
+      config.databaseId!,
+      config.propertiesCollectionId!,
+      propertyId
+    );
+
+    // Get the actual property owner ID from the property
+    const propertyOwnerId = property.propertyOwnerId;
+    
+    if (!propertyOwnerId) {
+      console.warn("Property has no owner ID:", propertyId);
+      return {
+        sellerId: "unknown_owner",
+        sellerName: "Property Owner",
+        sellerAvatar: property.image || "",
+      };
+    }
+
+    // Try to get the owner's user information
+    try {
+      const ownerUser = await databases.getDocument(
+        config.databaseId!,
+        config.usersCollectionId!,
+        propertyOwnerId
+      );
+      
+      return {
+        sellerId: propertyOwnerId,
+        sellerName: ownerUser.userName || "Property Owner",
+        sellerAvatar: property.image || "",
+      };
+    } catch (error) {
+      console.warn("Could not fetch owner user info:", error);
+      return {
+        sellerId: propertyOwnerId,
+        sellerName: "Property Owner",
+        sellerAvatar: property.image || "",
+      };
+    }
+  } catch (error: any) {
+    console.error("Error getting property owner:", {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+    });
+    return {
+      sellerId: "unknown_owner",
+      sellerName: "Property Owner",
+      sellerAvatar: "",
+    };
+  }
+}
+
+// Simple refresh functions for chat updates
+export function refreshUserChats(userId: string): Promise<Chat[]> {
+  return getUserChats(userId);
+}
+
+export function refreshChatMessages(chatId: string): Promise<Message[]> {
+  return getMessages(chatId);
 }

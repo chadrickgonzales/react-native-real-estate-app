@@ -1,43 +1,192 @@
-import AddPropertyBottomSheet from "@/components/AddPropertyBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import {
+    FlatList,
+    RefreshControl,
+    Text,
+    TouchableOpacity,
+    View
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const AddProperty = () => {
-  const [showBottomSheet, setShowBottomSheet] = useState(false);
+import { getCurrentUser, getUserChats, type Chat } from "@/lib/appwrite";
+import { useAppwrite } from "@/lib/useAppwrite";
 
-  const handleAddProperty = (propertyData: any) => {
-    // Handle property submission here
-    console.log("New property:", propertyData);
-    // You can add logic to save to database, show success message, etc.
+const ChatList = () => {
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Get current user
+  const { data: currentUser } = useAppwrite({
+    fn: getCurrentUser,
+    params: {},
+  });
+
+  // Get user chats
+  const { data: userChats, refetch } = useAppwrite({
+    fn: (params: { userId: string }) => getUserChats(params.userId),
+    params: { userId: currentUser?.$id || "" },
+    skip: !currentUser?.$id, // Skip if no user ID
+  });
+
+  // Refresh when tab is focused (e.g., returning from a chat)
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUser?.$id) {
+        // Fetch latest chats when tab is focused
+        refetch({ userId: currentUser.$id });
+      }
+    }, [currentUser?.$id])
+  );
+
+  useEffect(() => {
+    // Silent update - no console logs, just update the chat list
+    if (userChats) {
+      setChats(userChats);
+    }
+  }, [userChats]); // Removed currentUser from dependencies
+
+  // Silent pull-to-refresh function
+  const onRefresh = useCallback(async () => {
+    if (currentUser?.$id) {
+      setRefreshing(true);
+      await refetch({ userId: currentUser.$id });
+      setRefreshing(false);
+    }
+  }, [currentUser?.$id]); // Removed refetch from dependencies
+
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } else if (diffInHours < 168) { // 7 days
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
   };
 
+  const renderChatItem = ({ item }: { item: Chat }) => {
+    // Get location from property address or fallback to property name
+    const getLocation = () => {
+      if (item.propertyAddress) {
+        // Extract city/area from full address
+        const parts = item.propertyAddress.split(',');
+        return parts[parts.length - 1].trim();
+      }
+      return 'Location';
+    };
+
+    const getPropertyName = () => {
+      return item.propertyName || 'Property';
+    };
+
+    return (
+      <TouchableOpacity
+        className="flex-row items-center p-4 border-b border-gray-100"
+        onPress={() => router.push({
+          pathname: '/chat-conversation',
+          params: {
+            chatId: item.$id,
+            propertyId: item.propertyId,
+            propertyName: item.propertyName,
+            sellerName: item.sellerName,
+            sellerAvatar: item.sellerAvatar,
+          }
+        })}
+      >
+        <View className="mr-3">
+          <View className="w-12 h-12 rounded-full bg-blue-100 items-center justify-center">
+            <Ionicons name="home" size={24} color="#3B82F6" />
+          </View>
+        </View>
+        
+        <View className="flex-1">
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="text-gray-900 font-rubik-bold text-base" numberOfLines={1}>
+              {getPropertyName()}
+            </Text>
+            <Text className="text-gray-500 font-rubik text-xs">
+              {item.lastMessageTime ? formatTime(item.lastMessageTime) : ""}
+            </Text>
+          </View>
+          
+          <Text className="text-gray-600 font-rubik text-sm mb-1" numberOfLines={1}>
+            📍 {getLocation()}
+          </Text>
+          
+          <Text className="text-gray-500 font-rubik text-sm" numberOfLines={1}>
+            {item.lastMessage || "No messages yet"}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Remove loading UI - show empty state or chats directly
+
+  if (chats.length === 0) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <View className="flex-1 items-center justify-center px-8">
+          <Ionicons name="chatbubbles-outline" size={80} color="#9CA3AF" />
+          <Text className="text-xl font-rubik-bold text-gray-900 mt-4 mb-2">
+            No Chats Yet
+          </Text>
+          <Text className="text-base font-rubik text-gray-600 text-center">
+            Start a conversation by messaging a property owner from any property listing.
+          </Text>
+          <TouchableOpacity 
+            className="bg-blue-600 rounded-full px-6 py-3 mt-6"
+            onPress={() => router.push('/(root)/(tabs)/explore')}
+          >
+            <Text className="text-white font-rubik-bold">Browse Properties</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
-      <View className="items-center">
-        <Ionicons name="add-circle-outline" size={80} color="#666" />
-        <Text className="text-xl font-rubik-bold text-black mt-4 mb-2">
-          Add Property
-        </Text>
-        <Text className="text-base font-rubik text-gray-600 text-center px-8">
-          Tap the plus icon in the navigation bar to add a new property
-        </Text>
-        <TouchableOpacity 
-          className="bg-blue-600 rounded-full px-6 py-3 mt-6"
-          onPress={() => setShowBottomSheet(true)}
-        >
-          <Text className="text-white font-rubik-bold">Add Property</Text>
-        </TouchableOpacity>
+    <SafeAreaView className="flex-1 bg-white">
+      {/* Header */}
+      <View className="px-4 py-3 border-b border-gray-200">
+        <Text className="text-2xl font-rubik-bold text-gray-900">Messages</Text>
       </View>
 
-      <AddPropertyBottomSheet
-        visible={showBottomSheet}
-        onClose={() => setShowBottomSheet(false)}
-        onSubmit={handleAddProperty}
+      {/* Chat List */}
+      <FlatList
+        data={chats}
+        renderItem={renderChatItem}
+        keyExtractor={(item) => item.$id}
+        showsVerticalScrollIndicator={true}
+        className="flex-1"
+        contentContainerStyle={{ flexGrow: 1 }}
+        scrollEnabled={true}
+        bounces={true}
+        alwaysBounceVertical={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3B82F6']} // Android
+            tintColor="#3B82F6" // iOS
+          />
+        }
       />
     </SafeAreaView>
   );
 };
 
-export default AddProperty;
+export default ChatList;

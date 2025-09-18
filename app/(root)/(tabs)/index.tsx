@@ -235,7 +235,7 @@ const Home = () => {
               
               {/* Chat Button */}
               <View className="p-2 bg-white rounded-full shadow-md">
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/chat')}>
                   <Ionicons name="chatbubble-outline" size={24} color="#191D31" />
                 </TouchableOpacity>
               </View>

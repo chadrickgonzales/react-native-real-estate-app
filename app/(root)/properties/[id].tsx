@@ -8,6 +8,7 @@ import {
   Modal,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from "react-native";
@@ -29,6 +30,7 @@ const Property = () => {
   const [showTimeSlots, setShowTimeSlots] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [showBookingConfirmation, setShowBookingConfirmation] = useState(false);
+  const [messageText, setMessageText] = useState("");
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -397,15 +399,36 @@ const Property = () => {
                 <Text className="text-black font-rubik-medium text-base">Send seller a message</Text>
               </View>
               
-              {/* Message Input */}
-              <View className="flex-row items-center mb-6">
-                <View className="flex-1 bg-gray-100 rounded-full px-4 py-4 mr-3">
-                  <Text className="text-gray-400 font-rubik text-base">Is this still available?</Text>
+                {/* Message Input */}
+                <View className="flex-row items-center mb-6">
+                  <TextInput
+                    className="flex-1 bg-gray-100 rounded-full px-4 py-4 mr-3 text-gray-900 font-rubik text-base"
+                    placeholder="Is this still available?"
+                    placeholderTextColor="#9CA3AF"
+                    value={messageText}
+                    onChangeText={setMessageText}
+                    multiline={false}
+                    maxLength={200}
+                  />
+                  <TouchableOpacity 
+                    className="bg-blue-500 px-6 py-4 rounded-full"
+                    onPress={() => {
+                      console.log("Send button clicked with message:", messageText);
+                      router.push({
+                        pathname: '/chat-conversation',
+                        params: {
+                          propertyId: property?.$id,
+                          propertyName: property?.name || 'Property',
+                          sellerName: 'Property Owner',
+                          sellerAvatar: property?.image,
+                          initialMessage: messageText
+                        }
+                      });
+                    }}
+                  >
+                    <Text className="text-white font-rubik-bold text-base">Send</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity className="bg-blue-500 px-6 py-4 rounded-full">
-                  <Text className="text-white font-rubik-bold text-base">Send</Text>
-                </TouchableOpacity>
-              </View>
             </View>
 
             {/* Description */}
