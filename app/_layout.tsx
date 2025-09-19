@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 
 import GlobalProvider from "@/lib/global-provider";
+import OfflineStatus from "@/components/OfflineStatus";
 import "./globals.css";
 
 export default function RootLayout() {
@@ -29,6 +30,7 @@ export default function RootLayout() {
   return (
     <GlobalProvider>
       <Stack screenOptions={{ headerShown: false }} />
+      <OfflineStatus position="top" />
     </GlobalProvider>
   );
 }

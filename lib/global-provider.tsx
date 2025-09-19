@@ -5,6 +5,7 @@ import MapView from 'react-native-maps';
 
 import { getCurrentUser } from "./appwrite";
 import { useAppwrite } from "./useAppwrite";
+import { initializeOfflineSync } from "./offline-sync";
 
 interface GlobalContextType {
   isLogged: boolean;
@@ -91,6 +92,15 @@ export const GlobalProvider = ({ children }: GlobalProviderProps) => {
       }
     })();
   }, []);
+
+  // Initialize offline sync when user changes
+  useEffect(() => {
+    if (user) {
+      initializeOfflineSync(user.$id).catch(error => {
+        console.error('Failed to initialize offline sync:', error);
+      });
+    }
+  }, [user]);
 
   // Preload map component after location is available
   useEffect(() => {
