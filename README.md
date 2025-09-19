@@ -10,11 +10,36 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Set up the database (see [Scripts Directory](./scripts/README.md))
+
+   ```bash
+   cd scripts
+   node setup-appwrite.js
+   node setup-saved-collections.js
+   ```
+
+3. Start the app
 
    ```bash
    npx expo start
    ```
+
+## 📁 Scripts Directory
+
+All setup, migration, and testing scripts are organized in the [`scripts/`](./scripts/) directory. See the [Scripts README](./scripts/README.md) for detailed documentation of each script.
+
+### Quick Setup Commands
+
+```bash
+# Initial database setup
+cd scripts
+node setup-appwrite.js
+node setup-saved-collections.js
+
+# Test the notification system
+node test-notifications-comprehensive.js
+node verify-notifications.js
+```
 
 In the output, you'll find options to open the app in a
 
