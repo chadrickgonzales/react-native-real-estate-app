@@ -17,10 +17,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import images from "@/constants/images";
 
 import { getPropertyById } from "@/lib/appwrite";
-import { createImageSource } from "@/lib/imageUtils";
-import { useAppwrite } from "@/lib/useAppwrite";
 import { createBooking, getAvailableBookingSlots, isTimeSlotAvailable } from "@/lib/booking";
 import { useGlobalContext } from "@/lib/global-provider";
+import { createImageSource } from "@/lib/imageUtils";
+import { useAppwrite } from "@/lib/useAppwrite";
 
 const Property = () => {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -1051,6 +1051,7 @@ const Property = () => {
               </Text>
             </TouchableOpacity>
           </View>
+        </View>
         </View>
       </ScrollView>
 

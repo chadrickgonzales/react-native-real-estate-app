@@ -28,6 +28,9 @@ export const config = {
   bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID || "68c4f43100080f6b0d50",
 };
 
+// Export Query and ID for use in other files
+export { ID, Query };
+
 export const client = new Client();
 client
   .setEndpoint(config.endpoint!)

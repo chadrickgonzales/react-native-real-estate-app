@@ -3,16 +3,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    ScrollView,
+    StatusBar,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 
 import Filters from "@/components/Filters";
@@ -23,7 +23,6 @@ import { getLatestProperties, getProperties, isPropertySaved, saveProperty, unsa
 import { calculateDistance, filterPropertiesByDistance, geocodeSearchTerm, getSearchSuggestions } from "@/lib/geocoding";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
-import seed from "@/lib/seed";
 import { useAppwrite } from "@/lib/useAppwrite";
 
 const Home = () => {
