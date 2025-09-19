@@ -19,10 +19,24 @@ import {
 } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { useAppwrite } from "@/lib/useAppwrite";
+import { useNotifications, useNotificationPermissions } from "@/lib/useNotifications";
 
 const NotificationsSettings = () => {
   const { user } = useGlobalContext();
   const [loading, setLoading] = useState(false);
+  const { 
+    isInitialized, 
+    pushToken, 
+    permissions: pushPermissions,
+    initialize: initializePush,
+    pendingNotifications,
+    refreshPendingNotifications
+  } = useNotifications();
+  const { 
+    permissions: systemPermissions, 
+    requestPermissions, 
+    hasPermissions 
+  } = useNotificationPermissions();
 
   // Get notification settings
   const { data: settings, loading: settingsLoading, refetch } = useAppwrite({
@@ -137,6 +151,46 @@ const NotificationsSettings = () => {
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        {/* Push Notification Status */}
+        <View className="bg-white mx-5 mt-4 rounded-xl p-4 shadow-sm">
+          <Text className="text-lg font-rubik-bold text-black-300 mb-4">Push Notifications</Text>
+          
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-gray-700 font-rubik">Status</Text>
+            <View className="flex-row items-center">
+              <View className={`w-3 h-3 rounded-full mr-2 ${hasPermissions ? 'bg-green-500' : 'bg-red-500'}`} />
+              <Text className={`font-rubik-bold ${hasPermissions ? 'text-green-600' : 'text-red-600'}`}>
+                {hasPermissions ? 'Enabled' : 'Disabled'}
+              </Text>
+            </View>
+          </View>
+
+          {!hasPermissions && (
+            <TouchableOpacity 
+              onPress={requestPermissions}
+              className="bg-blue-500 py-3 px-4 rounded-lg mb-3"
+            >
+              <Text className="text-white font-rubik-bold text-center">Enable Push Notifications</Text>
+            </TouchableOpacity>
+          )}
+
+          {isInitialized && pushToken && (
+            <View className="bg-gray-50 rounded-lg p-3 mb-3">
+              <Text className="text-gray-600 font-rubik text-sm mb-1">Device Token</Text>
+              <Text className="text-gray-800 font-rubik-medium text-xs" numberOfLines={2}>
+                {pushToken.token.substring(0, 50)}...
+              </Text>
+            </View>
+          )}
+
+          {pendingNotifications.length > 0 && (
+            <View className="flex-row items-center justify-between">
+              <Text className="text-gray-700 font-rubik">Scheduled Notifications</Text>
+              <Text className="text-blue-600 font-rubik-bold">{pendingNotifications.length}</Text>
+            </View>
+          )}
+        </View>
+
         {/* Property Notifications */}
         <View className="mt-6">
           <Text className="text-lg font-rubik-bold text-gray-900 px-4 mb-2">
