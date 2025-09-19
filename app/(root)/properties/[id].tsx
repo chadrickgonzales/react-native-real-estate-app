@@ -1014,6 +1014,42 @@ const Property = () => {
             <Ionicons name="map-outline" size={20} color="#8B5CF6" />
             <Text className="text-purple-600 font-rubik-bold ml-2">Explore The Property</Text>
           </TouchableOpacity>
+
+          {/* Reviews Section */}
+          <View className="bg-white shadow-lg p-6 mb-1">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-rubik-bold text-gray-900">Reviews</Text>
+              <TouchableOpacity 
+                onPress={() => router.push(`/property-reviews?id=${id}`)}
+                className="flex-row items-center"
+              >
+                <Text className="text-blue-500 font-rubik-medium mr-1">View All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
+              </TouchableOpacity>
+            </View>
+            
+            <View className="flex-row items-center mb-3">
+              <View className="flex-row mr-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Ionicons
+                    key={star}
+                    name="star"
+                    size={16}
+                    color="#F59E0B"
+                  />
+                ))}
+              </View>
+              <Text className="text-gray-600 font-rubik">4.8 (24 reviews)</Text>
+            </View>
+            
+            <TouchableOpacity 
+              className="bg-gray-100 rounded-lg p-3"
+              onPress={() => router.push(`/property-reviews?id=${id}`)}
+            >
+              <Text className="text-gray-600 font-rubik text-center">
+                View all reviews and ratings
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
