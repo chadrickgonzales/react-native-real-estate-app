@@ -549,6 +549,189 @@ export async function getPropertiesByOwner(ownerId: string) {
   }
 }
 
+// Advanced search function
+export async function searchProperties(filters: {
+  query?: string;
+  propertyType?: 'sell' | 'rent' | '';
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  minArea?: number;
+  maxArea?: number;
+  location?: string;
+  amenities?: string[];
+  features?: string[];
+  sortBy?: 'price_asc' | 'price_desc' | 'newest' | 'oldest' | 'rating';
+  limit?: number;
+}) {
+  try {
+    const queries: any[] = [];
+    
+    // Property type filter
+    if (filters.propertyType) {
+      queries.push(Query.equal("propertyType", filters.propertyType));
+    }
+    
+    // Category filter
+    if (filters.category) {
+      queries.push(Query.equal("type", filters.category));
+    }
+    
+    // Price range filter
+    if (filters.minPrice !== undefined) {
+      queries.push(Query.greaterThanEqual("price", filters.minPrice));
+    }
+    if (filters.maxPrice !== undefined) {
+      queries.push(Query.lessThanEqual("price", filters.maxPrice));
+    }
+    
+    // Bedrooms filter
+    if (filters.bedrooms !== undefined) {
+      queries.push(Query.equal("bedrooms", filters.bedrooms));
+    }
+    
+    // Bathrooms filter
+    if (filters.bathrooms !== undefined) {
+      queries.push(Query.equal("bathrooms", filters.bathrooms));
+    }
+    
+    // Area range filter
+    if (filters.minArea !== undefined) {
+      queries.push(Query.greaterThanEqual("area", filters.minArea));
+    }
+    if (filters.maxArea !== undefined) {
+      queries.push(Query.lessThanEqual("area", filters.maxArea));
+    }
+    
+    // Location filter (search in address field)
+    if (filters.location) {
+      queries.push(Query.search("address", filters.location));
+    }
+    
+    // Text search in name and description
+    if (filters.query) {
+      // Note: Appwrite search is limited, so we'll do a simple search on name
+      queries.push(Query.search("name", filters.query));
+    }
+    
+    // Sorting
+    switch (filters.sortBy) {
+      case 'price_asc':
+        queries.push(Query.orderAsc("price"));
+        break;
+      case 'price_desc':
+        queries.push(Query.orderDesc("price"));
+        break;
+      case 'newest':
+        queries.push(Query.orderDesc("$createdAt"));
+        break;
+      case 'oldest':
+        queries.push(Query.orderAsc("$createdAt"));
+        break;
+      case 'rating':
+        queries.push(Query.orderDesc("rating"));
+        break;
+      default:
+        queries.push(Query.orderDesc("$createdAt"));
+    }
+    
+    // Limit results
+    queries.push(Query.limit(filters.limit || 50));
+    
+    const properties = await databases.listDocuments(
+      config.databaseId!,
+      config.propertiesCollectionId!,
+      queries
+    );
+    
+    let results = properties.documents;
+    
+    // Client-side filtering for complex queries that Appwrite doesn't support well
+    if (filters.amenities?.length) {
+      results = results.filter(property => {
+        const propertyAmenities = property.amenities?.toLowerCase() || '';
+        return filters.amenities!.some(amenity => 
+          propertyAmenities.includes(amenity.toLowerCase())
+        );
+      });
+    }
+    
+    if (filters.features?.length) {
+      results = results.filter(property => {
+        return filters.features!.some(feature => {
+          switch (feature) {
+            case 'Furnished':
+              return property.furnishedStatus === 'Furnished';
+            case 'Pet Friendly':
+              return property.petFriendly === true;
+            case 'Smoking Allowed':
+              return property.smokingAllowed === true;
+            case 'Wheelchair Accessible':
+              return property.wheelchairAccessible === true;
+            default:
+              return false;
+          }
+        });
+      });
+    }
+    
+    // Additional text search in description if query is provided
+    if (filters.query) {
+      const queryLower = filters.query.toLowerCase();
+      results = results.filter(property => {
+        const name = property.name?.toLowerCase() || '';
+        const description = property.description?.toLowerCase() || '';
+        const address = property.address?.toLowerCase() || '';
+        return name.includes(queryLower) || 
+               description.includes(queryLower) || 
+               address.includes(queryLower);
+      });
+    }
+    
+    return results;
+  } catch (error) {
+    console.error("Error searching properties:", error);
+    throw error;
+  }
+}
+
+// Get search suggestions
+export async function getSearchSuggestions(query: string) {
+  try {
+    if (!query || query.length < 2) return [];
+    
+    const properties = await databases.listDocuments(
+      config.databaseId!,
+      config.propertiesCollectionId!,
+      [
+        Query.search("name", query),
+        Query.limit(10)
+      ]
+    );
+    
+    const suggestions = properties.documents.map(property => ({
+      id: property.$id,
+      title: property.name,
+      subtitle: property.address,
+      type: 'property'
+    }));
+    
+    // Add location suggestions (you could expand this with a locations database)
+    const locationSuggestions = [
+      { id: 'loc1', title: 'New York', subtitle: 'City', type: 'location' },
+      { id: 'loc2', title: 'Los Angeles', subtitle: 'City', type: 'location' },
+      { id: 'loc3', title: 'Chicago', subtitle: 'City', type: 'location' },
+    ].filter(loc => loc.title.toLowerCase().includes(query.toLowerCase()));
+    
+    return [...suggestions, ...locationSuggestions].slice(0, 8);
+  } catch (error) {
+    console.error("Error getting search suggestions:", error);
+    return [];
+  }
+}
+
 // Image upload utility functions
 export async function uploadImage(file: any, propertyId: string, imageIndex: number) {
   try {

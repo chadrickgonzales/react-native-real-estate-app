@@ -171,18 +171,16 @@ const Home = () => {
       return;
     }
 
-    const geocodeResult = await geocodeSearchTerm(searchQuery);
-    if (geocodeResult) {
-      setSearchLocation({
-        latitude: geocodeResult.latitude,
-        longitude: geocodeResult.longitude,
-        placeName: geocodeResult.placeName
-      });
-      setShowSuggestions(false);
-    } else {
-      // If no geocoding result, clear location and show all properties
-      setSearchLocation(null);
-    }
+    setShowSuggestions(false);
+    
+    // Navigate to search results page with the query
+    router.push({
+      pathname: '/search-results',
+      params: { 
+        query: searchQuery.trim(),
+        propertyType: propertyTypeFilter
+      }
+    });
   };
 
   // Handle suggestion selection
