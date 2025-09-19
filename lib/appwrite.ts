@@ -532,6 +532,23 @@ export async function getPropertyById({ id }: { id: string }) {
   }
 }
 
+export async function getPropertiesByOwner(ownerId: string) {
+  try {
+    const properties = await databases.listDocuments(
+      config.databaseId!,
+      config.propertiesCollectionId!,
+      [
+        Query.equal("ownerId", ownerId),
+        Query.orderDesc("$createdAt")
+      ]
+    );
+    return properties.documents;
+  } catch (error) {
+    console.error("Error fetching owner properties:", error);
+    throw error;
+  }
+}
+
 // Image upload utility functions
 export async function uploadImage(file: any, propertyId: string, imageIndex: number) {
   try {

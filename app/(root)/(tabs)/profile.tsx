@@ -364,6 +364,11 @@ const Profile = () => {
               onPress={() => router.push('/profilePages/my-bookings')}
             />
             <SettingsItem 
+              icon={icons.home} 
+              title="Owner Dashboard" 
+              onPress={() => router.push('/owner-dashboard')}
+            />
+            <SettingsItem 
               icon={icons.wallet} 
               title="Payments" 
               onPress={() => router.push('/profilePages/payments')}
