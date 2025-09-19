@@ -74,6 +74,13 @@ async function setupSavedCollections() {
             array: false,
           },
           {
+            key: 'listingType',
+            type: 'enum',
+            elements: ['sale', 'rent'],
+            required: true,
+            array: false,
+          },
+          {
             key: 'bedrooms',
             type: 'integer',
             required: true,

@@ -17,7 +17,8 @@ import images from "@/constants/images";
 import {
   deleteSavedSearch,
   getSavedProperties,
-  getSavedSearches
+  getSavedSearches,
+  unsaveProperty
 } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
@@ -26,12 +27,16 @@ import { useAppwrite } from "@/lib/useAppwrite";
 const Saved = () => {
   const [activeTab, setActiveTab] = useState("Updates");
   const [refreshing, setRefreshing] = useState(false);
+  const [listingFilter, setListingFilter] = useState<'all' | 'sale' | 'rent'>('all');
   const { user } = useGlobalContext();
 
   // Get saved properties
   const { data: savedProperties, loading: propertiesLoading, refetch: refetchProperties } = useAppwrite({
-    fn: ({ userId }: { userId: string }) => getSavedProperties(userId),
-    params: { userId: user?.$id || "" },
+    fn: ({ userId, listingType }: { userId: string; listingType?: 'sale' | 'rent' }) => getSavedProperties(userId, listingType),
+    params: { 
+      userId: user?.$id || "",
+      listingType: listingFilter === 'all' ? undefined : listingFilter
+    },
     skip: !user?.$id,
   });
 
@@ -46,12 +51,15 @@ const Saved = () => {
     if (user?.$id) {
       setRefreshing(true);
       await Promise.all([
-        refetchProperties({ userId: user.$id }),
+        refetchProperties({ 
+          userId: user.$id,
+          listingType: listingFilter === 'all' ? undefined : listingFilter
+        }),
         refetchSearches({ userId: user.$id })
       ]);
       setRefreshing(false);
     }
-  }, [user?.$id, refetchProperties, refetchSearches]);
+  }, [user?.$id, refetchProperties, refetchSearches, listingFilter]);
 
   const handleDeleteSearch = async (searchId: string) => {
     Alert.alert(
@@ -69,6 +77,35 @@ const Saved = () => {
               Alert.alert('Success', 'Saved search deleted successfully!');
             } catch (error) {
               Alert.alert('Error', 'Failed to delete saved search');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleUnsaveProperty = async (propertyId: string) => {
+    if (!user?.$id) return;
+    
+    Alert.alert(
+      'Remove from Saved',
+      'Are you sure you want to remove this property from your saved list?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Remove', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await unsaveProperty(propertyId, user.$id);
+              await refetchProperties({ 
+                userId: user.$id,
+                listingType: listingFilter === 'all' ? undefined : listingFilter
+              });
+              Alert.alert('Success', 'Property removed from saved list!');
+            } catch (error) {
+              console.error('Error unsaving property:', error);
+              Alert.alert('Error', 'Failed to remove property from saved list');
             }
           }
         }
@@ -237,6 +274,64 @@ const Saved = () => {
                 Saved Properties
               </Text>
               
+              {/* Filter Pills */}
+              <View className="flex-row mb-4">
+                <TouchableOpacity
+                  onPress={() => setListingFilter('all')}
+                  className={`px-4 py-2 rounded-full mr-3 ${
+                    listingFilter === 'all'
+                      ? 'bg-primary-300'
+                      : 'bg-gray-200'
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-rubik-medium ${
+                      listingFilter === 'all'
+                        ? 'text-white'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    All
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setListingFilter('sale')}
+                  className={`px-4 py-2 rounded-full mr-3 ${
+                    listingFilter === 'sale'
+                      ? 'bg-primary-300'
+                      : 'bg-gray-200'
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-rubik-medium ${
+                      listingFilter === 'sale'
+                        ? 'text-white'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    For Sale
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setListingFilter('rent')}
+                  className={`px-4 py-2 rounded-full ${
+                    listingFilter === 'rent'
+                      ? 'bg-primary-300'
+                      : 'bg-gray-200'
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-rubik-medium ${
+                      listingFilter === 'rent'
+                        ? 'text-white'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    For Rent
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
               {propertiesLoading ? (
                 <View className="items-center py-8">
                   <ActivityIndicator size="large" color="#0061FF" />
@@ -261,13 +356,28 @@ const Saved = () => {
                             className="w-full h-48"
                             resizeMode="cover"
                           />
-                          <TouchableOpacity className="absolute top-3 right-3">
+                          <TouchableOpacity 
+                            className="absolute top-3 right-3 bg-white/80 p-2 rounded-full"
+                            onPress={() => handleUnsaveProperty(property.propertyId)}
+                          >
                             <Ionicons
                               name="heart"
-                              size={24}
+                              size={20}
                               color="#FF6B6B"
                             />
                           </TouchableOpacity>
+                          {/* Listing Type Badge */}
+                          <View className="absolute top-3 left-3">
+                            <View className={`px-3 py-1 rounded-full ${
+                              property.listingType === 'sale' 
+                                ? 'bg-green-500' 
+                                : 'bg-blue-500'
+                            }`}>
+                              <Text className="text-white text-xs font-rubik-bold">
+                                {property.listingType === 'sale' ? 'FOR SALE' : 'FOR RENT'}
+                              </Text>
+                            </View>
+                          </View>
                         </View>
                         
                         <View className="p-4">

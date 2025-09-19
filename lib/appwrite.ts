@@ -897,7 +897,7 @@ export async function createOrGetChat({
     
     if (existingChats.documents.length > 0) {
       // Chat exists, return it
-      chat = existingChats.documents[0] as Chat;
+      chat = existingChats.documents[0] as unknown as Chat;
     } else {
       // Create new chat
       const newChat = await databases.createDocument(
@@ -916,7 +916,7 @@ export async function createOrGetChat({
           updatedAt: new Date().toISOString(),
         }
       );
-      chat = newChat as Chat;
+      chat = newChat as unknown as Chat;
     }
 
     // If there's an initial message, send it
@@ -991,7 +991,7 @@ export async function sendMessage({
       }
     );
 
-    return message as Message;
+    return message as unknown as Message;
   } catch (error: any) {
     console.error("Error sending message:", {
       message: error.message,
@@ -1021,7 +1021,7 @@ export async function getMessages(chatId: string) {
       ]
     );
 
-    return messages.documents as Message[];
+    return messages.documents as unknown as Message[];
   } catch (error: any) {
     console.error("Error getting messages:", {
       message: error.message,
@@ -1059,7 +1059,7 @@ export async function getUserChats(userId: string) {
       ]
     );
 
-    return chats.documents as Chat[];
+    return chats.documents as unknown as Chat[];
   } catch (error: any) {
     console.error("Error getting user chats:", {
       message: error.message,
@@ -1186,6 +1186,7 @@ export interface SavedProperty {
   propertyImage: string;
   price: number;
   propertyType: string;
+  listingType: 'sale' | 'rent';
   bedrooms: number;
   bathrooms: number;
   area: number;
@@ -1212,7 +1213,7 @@ export interface SavedSearch {
 }
 
 // Add saved property to user's favorites
-export async function saveProperty(propertyId: string, userId: string) {
+export async function saveProperty(propertyId: string, userId: string, listingType?: 'sale' | 'rent') {
   try {
     // Get property details first
     const property = await databases.getDocument(
@@ -1250,6 +1251,23 @@ export async function saveProperty(propertyId: string, userId: string) {
       }
     }
 
+    // Determine listing type based on property data
+    let determinedListingType: 'sale' | 'rent' = 'sale'; // Default to sale
+    
+    if (listingType) {
+      // Use provided listing type
+      determinedListingType = listingType;
+    } else if (property.listingType) {
+      // Use property's listing type if available
+      determinedListingType = property.listingType;
+    } else if (property.leaseDuration && property.leaseDuration.trim() !== '') {
+      // If property has lease duration, it's likely for rent
+      determinedListingType = 'rent';
+    } else if (property.deposit && property.deposit.trim() !== '') {
+      // If property has deposit, it's likely for rent
+      determinedListingType = 'rent';
+    }
+
     // Create saved property record
     const savedProperty = await databases.createDocument(
       config.databaseId!,
@@ -1263,11 +1281,11 @@ export async function saveProperty(propertyId: string, userId: string) {
         propertyImage,
         price: property.price,
         propertyType: property.type,
+        listingType: determinedListingType, // Use determined listing type
         bedrooms: property.bedrooms,
         bathrooms: property.bathrooms,
         area: property.area,
         addedDate: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
       }
     );
 
@@ -1308,18 +1326,25 @@ export async function unsaveProperty(propertyId: string, userId: string) {
 }
 
 // Get user's saved properties
-export async function getSavedProperties(userId: string) {
+export async function getSavedProperties(userId: string, listingType?: 'sale' | 'rent') {
   try {
+    const queries = [
+      Query.equal("userId", userId),
+      Query.orderDesc("addedDate")
+    ];
+
+    // Add listing type filter if specified
+    if (listingType) {
+      queries.push(Query.equal("listingType", listingType));
+    }
+
     const savedProperties = await databases.listDocuments(
       config.databaseId!,
       "saved_properties",
-      [
-        Query.equal("userId", userId),
-        Query.orderDesc("addedDate")
-      ]
+      queries
     );
 
-    return savedProperties.documents as SavedProperty[];
+    return savedProperties.documents as unknown as SavedProperty[];
   } catch (error: any) {
     console.error("Error getting saved properties:", error);
     return [];
@@ -1388,7 +1413,6 @@ export async function saveSearch({
         isActive: true,
         lastChecked: new Date().toISOString(),
         newMatches: 0,
-        createdAt: new Date().toISOString(),
       }
     );
 
@@ -1406,12 +1430,11 @@ export async function getSavedSearches(userId: string) {
       config.databaseId!,
       "saved_searches",
       [
-        Query.equal("userId", userId),
-        Query.orderDesc("createdAt")
+        Query.equal("userId", userId)
       ]
     );
 
-    return savedSearches.documents as SavedSearch[];
+    return savedSearches.documents as unknown as SavedSearch[];
   } catch (error: any) {
     console.error("Error getting saved searches:", error);
     return [];
@@ -1512,7 +1535,6 @@ export async function createNotification({
         data: data ? JSON.stringify(data) : "",
         isRead: false,
         priority,
-        createdAt: new Date().toISOString(),
       }
     );
 
@@ -1531,12 +1553,11 @@ export async function getUserNotifications(userId: string, limit: number = 50) {
       "notifications",
       [
         Query.equal("userId", userId),
-        Query.orderDesc("createdAt"),
         Query.limit(limit)
       ]
     );
 
-    return notifications.documents as Notification[];
+    return notifications.documents as unknown as Notification[];
   } catch (error: any) {
     console.error("Error getting user notifications:", error);
     return [];
@@ -1605,7 +1626,7 @@ export async function getNotificationSettings(userId: string) {
     );
 
     if (settings.documents.length > 0) {
-      return settings.documents[0] as NotificationSettings;
+      return settings.documents[0] as unknown as NotificationSettings;
     }
 
     // Create default settings if none exist
@@ -1623,12 +1644,10 @@ export async function getNotificationSettings(userId: string) {
         engagementNotifications: true,
         emailNotifications: true,
         pushNotifications: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       }
     );
 
-    return defaultSettings as NotificationSettings;
+    return defaultSettings as unknown as NotificationSettings;
   } catch (error: any) {
     console.error("Error getting notification settings:", error);
     throw error;
