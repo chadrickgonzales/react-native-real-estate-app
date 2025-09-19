@@ -19,9 +19,12 @@ import images from "@/constants/images";
 import { getPropertyById } from "@/lib/appwrite";
 import { createImageSource } from "@/lib/imageUtils";
 import { useAppwrite } from "@/lib/useAppwrite";
+import { createBooking, getAvailableBookingSlots, isTimeSlotAvailable } from "@/lib/booking";
+import { useGlobalContext } from "@/lib/global-provider";
 
 const Property = () => {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { user } = useGlobalContext();
   const [imageError, setImageError] = useState(false);
   const [currentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
@@ -31,6 +34,10 @@ const Property = () => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [showBookingConfirmation, setShowBookingConfirmation] = useState(false);
   const [messageText, setMessageText] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
+  const [isCreatingBooking, setIsCreatingBooking] = useState(false);
+  const [guests, setGuests] = useState(1);
+  const [specialRequests, setSpecialRequests] = useState("");
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -174,10 +181,21 @@ const Property = () => {
     return timeSlots;
   };
 
-  const handleDateClick = (day: number) => {
+  const handleDateClick = async (day: number) => {
     if (isDateAvailable(day, currentMonth) && !isDateBooked(day, currentMonth)) {
       setSelectedDate(day);
       setShowTimeSlots(true);
+      
+      // Fetch real available slots for the selected date
+      if (property) {
+        try {
+          const dateString = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          const slots = await getAvailableBookingSlots(property.$id, dateString);
+          setAvailableSlots(slots);
+        } catch (error) {
+          console.error('Error fetching available slots:', error);
+        }
+      }
     }
   };
 
@@ -193,15 +211,62 @@ const Property = () => {
     setShowBookingConfirmation(true);
   };
 
-  const confirmBooking = () => {
-    // Here you would typically make an API call to book the appointment
-    // For now, we'll just show a success message and close the modal
-    alert(`Viewing appointment confirmed!\n\nProperty: ${property?.name || 'Property'}\nDate: ${currentMonth.toLocaleDateString('en-US', { month: 'long' })} ${selectedDate}, ${currentMonth.getFullYear()}\nTime: ${selectedTimeSlot}\n\nYou will receive a confirmation email shortly.`);
+  const confirmBooking = async () => {
+    if (!user || !property || !selectedDate || !selectedTimeSlot) {
+      alert('Please complete all booking details');
+      return;
+    }
+
+    setIsCreatingBooking(true);
     
-    // Close all modals and reset state
-    setShowBookingConfirmation(false);
-    setSelectedTimeSlot(null);
-    setSelectedDate(null);
+    try {
+      const dateString = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.toString().padStart(2, '0')}`;
+      
+      // Check if slot is still available
+      const isAvailable = await isTimeSlotAvailable(property.$id, dateString, selectedTimeSlot);
+      if (!isAvailable) {
+        alert('This time slot is no longer available. Please select another time.');
+        return;
+      }
+
+      // Create the booking
+      const bookingData = {
+        userId: user.$id,
+        propertyId: property.$id,
+        propertyName: property.name || 'Property',
+        propertyAddress: property.address || 'Address not specified',
+        propertyImage: property.images?.[0] || property.image || '',
+        ownerId: property.ownerId || 'unknown',
+        ownerName: property.ownerName || 'Property Owner',
+        ownerEmail: property.contactEmail || 'owner@example.com',
+        ownerPhone: property.contactPhone || 'N/A',
+        bookingDate: dateString,
+        bookingTime: selectedTimeSlot,
+        duration: 60,
+        totalAmount: property.price || 0,
+        currency: 'USD',
+        guests,
+        specialRequests
+      };
+
+      const result = await createBooking(bookingData);
+      
+      if (result.success) {
+        alert(`Booking confirmed!\n\nProperty: ${property.name}\nDate: ${currentMonth.toLocaleDateString('en-US', { month: 'long' })} ${selectedDate}, ${currentMonth.getFullYear()}\nTime: ${selectedTimeSlot}\n\nYou will receive a confirmation email shortly.`);
+        
+        // Close all modals and reset state
+        setShowBookingConfirmation(false);
+        setSelectedTimeSlot(null);
+        setSelectedDate(null);
+        setGuests(1);
+        setSpecialRequests("");
+      }
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      alert('Failed to create booking. Please try again.');
+    } finally {
+      setIsCreatingBooking(false);
+    }
   };
 
   const cancelBooking = () => {
@@ -976,26 +1041,30 @@ const Property = () => {
             </Text>
 
             <View className="flex-row flex-wrap gap-2 mb-4">
-              {selectedDate && generateTimeSlots(selectedDate).map((slot) => (
-                <TouchableOpacity
-                  key={slot.id}
-                  onPress={() => slot.available && handleTimeSlotSelect(slot.time)}
-                  className={`px-4 py-2 rounded-lg border ${
-                    slot.available 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-gray-50 border-gray-200'
-                  }`}
-                  disabled={!slot.available}
-                >
-                  <Text className={`font-rubik text-sm ${
-                    slot.available 
-                      ? 'text-green-700' 
-                      : 'text-gray-400'
-                  }`}>
-                    {slot.time}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {availableSlots.length > 0 ? (
+                availableSlots.map((slot) => (
+                  <TouchableOpacity
+                    key={slot.time}
+                    onPress={() => slot.available && handleTimeSlotSelect(slot.time)}
+                    className={`px-4 py-2 rounded-lg border ${
+                      slot.available 
+                        ? 'bg-green-50 border-green-200' 
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                    disabled={!slot.available}
+                  >
+                    <Text className={`font-rubik text-sm ${
+                      slot.available 
+                        ? 'text-green-700' 
+                        : 'text-gray-400'
+                    }`}>
+                      {slot.time}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text className="text-gray-500 font-rubik">Loading available slots...</Text>
+              )}
             </View>
 
             <View className="p-3 bg-blue-50 rounded-lg">
@@ -1058,16 +1127,51 @@ const Property = () => {
               <View className="flex-row items-center mb-2">
                 <Ionicons name="time" size={16} color="#3B82F6" />
                 <Text className="text-gray-600 font-rubik ml-2">
-                  {selectedTimeSlot} (30-60 minutes)
+                  {selectedTimeSlot} (60 minutes)
                 </Text>
               </View>
               
-              <View className="flex-row items-center">
-                <Ionicons name="person" size={16} color="#3B82F6" />
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="people" size={16} color="#3B82F6" />
                 <Text className="text-gray-600 font-rubik ml-2">
-                  Property viewing appointment
+                  {guests} {guests === 1 ? 'Guest' : 'Guests'}
                 </Text>
               </View>
+            </View>
+
+            {/* Guest Count */}
+            <View className="mb-4">
+              <Text className="text-gray-900 font-rubik-bold text-base mb-2">Number of Guests</Text>
+              <View className="flex-row items-center">
+                <TouchableOpacity 
+                  onPress={() => setGuests(Math.max(1, guests - 1))}
+                  className="w-8 h-8 bg-gray-200 rounded-full items-center justify-center"
+                >
+                  <Ionicons name="remove" size={16} color="#666" />
+                </TouchableOpacity>
+                <Text className="mx-4 text-lg font-rubik-bold">{guests}</Text>
+                <TouchableOpacity 
+                  onPress={() => setGuests(guests + 1)}
+                  className="w-8 h-8 bg-gray-200 rounded-full items-center justify-center"
+                >
+                  <Ionicons name="add" size={16} color="#666" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Special Requests */}
+            <View className="mb-4">
+              <Text className="text-gray-900 font-rubik-bold text-base mb-2">Special Requests (Optional)</Text>
+              <TextInput
+                className="bg-gray-100 rounded-lg px-3 py-3 text-gray-900 font-rubik"
+                placeholder="Any special requirements or notes..."
+                placeholderTextColor="#9CA3AF"
+                value={specialRequests}
+                onChangeText={setSpecialRequests}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
             </View>
 
             {/* Contact Info */}
@@ -1089,9 +1193,17 @@ const Property = () => {
               
               <TouchableOpacity 
                 onPress={confirmBooking}
-                className="flex-1 py-3 px-4 bg-blue-500 rounded-lg"
+                disabled={isCreatingBooking}
+                className={`flex-1 py-3 px-4 rounded-lg ${isCreatingBooking ? 'bg-gray-400' : 'bg-blue-500'}`}
               >
-                <Text className="text-white font-rubik-bold text-center">Confirm Booking</Text>
+                {isCreatingBooking ? (
+                  <View className="flex-row items-center justify-center">
+                    <Text className="text-white font-rubik-bold mr-2">Creating...</Text>
+                    <Ionicons name="hourglass" size={16} color="white" />
+                  </View>
+                ) : (
+                  <Text className="text-white font-rubik-bold text-center">Confirm Booking</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
