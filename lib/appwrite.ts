@@ -1,14 +1,14 @@
 import * as Linking from "expo-linking";
 import { openAuthSessionAsync } from "expo-web-browser";
 import {
-    Account,
-    Avatars,
-    Client,
-    Databases,
-    ID,
-    OAuthProvider,
-    Query,
-    Storage
+  Account,
+  Avatars,
+  Client,
+  Databases,
+  ID,
+  OAuthProvider,
+  Query,
+  Storage
 } from "react-native-appwrite";
 
 export const config = {
@@ -1174,4 +1174,688 @@ export function refreshUserChats(userId: string): Promise<Chat[]> {
 
 export function refreshChatMessages(chatId: string): Promise<Message[]> {
   return getMessages(chatId);
+}
+
+// Saved Properties and Searches functionality
+export interface SavedProperty {
+  $id: string;
+  userId: string;
+  propertyId: string;
+  propertyName: string;
+  propertyAddress: string;
+  propertyImage: string;
+  price: number;
+  propertyType: string;
+  bedrooms: number;
+  bathrooms: number;
+  area: number;
+  addedDate: string;
+  createdAt: string;
+}
+
+export interface SavedSearch {
+  $id: string;
+  userId: string;
+  searchName: string;
+  searchQuery: string;
+  filters: string;
+  location: string;
+  priceMin: number;
+  priceMax: number;
+  propertyType: string;
+  bedrooms: number;
+  bathrooms: number;
+  isActive: boolean;
+  lastChecked: string;
+  newMatches: number;
+  createdAt: string;
+}
+
+// Add saved property to user's favorites
+export async function saveProperty(propertyId: string, userId: string) {
+  try {
+    // Get property details first
+    const property = await databases.getDocument(
+      config.databaseId!,
+      config.propertiesCollectionId!,
+      propertyId
+    );
+
+    if (!property) {
+      throw new Error("Property not found");
+    }
+
+    // Check if already saved
+    const existingSaved = await databases.listDocuments(
+      config.databaseId!,
+      "saved_properties", // We'll need to create this collection
+      [
+        Query.equal("userId", userId),
+        Query.equal("propertyId", propertyId)
+      ]
+    );
+
+    if (existingSaved.documents.length > 0) {
+      return { success: false, message: "Property already saved" };
+    }
+
+    // Parse images
+    let propertyImage = property.image || "";
+    if (property.images) {
+      try {
+        const parsedImages = JSON.parse(property.images);
+        propertyImage = parsedImages[0] || property.image || "";
+      } catch {
+        propertyImage = property.image || "";
+      }
+    }
+
+    // Create saved property record
+    const savedProperty = await databases.createDocument(
+      config.databaseId!,
+      "saved_properties",
+      ID.unique(),
+      {
+        userId,
+        propertyId,
+        propertyName: property.name,
+        propertyAddress: property.address,
+        propertyImage,
+        price: property.price,
+        propertyType: property.type,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        area: property.area,
+        addedDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      }
+    );
+
+    return { success: true, data: savedProperty };
+  } catch (error: any) {
+    console.error("Error saving property:", error);
+    throw error;
+  }
+}
+
+// Remove saved property from user's favorites
+export async function unsaveProperty(propertyId: string, userId: string) {
+  try {
+    const existingSaved = await databases.listDocuments(
+      config.databaseId!,
+      "saved_properties",
+      [
+        Query.equal("userId", userId),
+        Query.equal("propertyId", propertyId)
+      ]
+    );
+
+    if (existingSaved.documents.length === 0) {
+      return { success: false, message: "Property not found in saved list" };
+    }
+
+    await databases.deleteDocument(
+      config.databaseId!,
+      "saved_properties",
+      existingSaved.documents[0].$id
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error unsaving property:", error);
+    throw error;
+  }
+}
+
+// Get user's saved properties
+export async function getSavedProperties(userId: string) {
+  try {
+    const savedProperties = await databases.listDocuments(
+      config.databaseId!,
+      "saved_properties",
+      [
+        Query.equal("userId", userId),
+        Query.orderDesc("addedDate")
+      ]
+    );
+
+    return savedProperties.documents as SavedProperty[];
+  } catch (error: any) {
+    console.error("Error getting saved properties:", error);
+    return [];
+  }
+}
+
+// Check if property is saved by user
+export async function isPropertySaved(propertyId: string, userId: string) {
+  try {
+    const existingSaved = await databases.listDocuments(
+      config.databaseId!,
+      "saved_properties",
+      [
+        Query.equal("userId", userId),
+        Query.equal("propertyId", propertyId)
+      ]
+    );
+
+    return existingSaved.documents.length > 0;
+  } catch (error: any) {
+    console.error("Error checking if property is saved:", error);
+    return false;
+  }
+}
+
+// Save a search query
+export async function saveSearch({
+  userId,
+  searchName,
+  searchQuery,
+  filters,
+  location,
+  priceMin,
+  priceMax,
+  propertyType,
+  bedrooms,
+  bathrooms,
+}: {
+  userId: string;
+  searchName: string;
+  searchQuery: string;
+  filters: string;
+  location: string;
+  priceMin: number;
+  priceMax: number;
+  propertyType: string;
+  bedrooms: number;
+  bathrooms: number;
+}) {
+  try {
+    const savedSearch = await databases.createDocument(
+      config.databaseId!,
+      "saved_searches",
+      ID.unique(),
+      {
+        userId,
+        searchName,
+        searchQuery,
+        filters,
+        location,
+        priceMin,
+        priceMax,
+        propertyType,
+        bedrooms,
+        bathrooms,
+        isActive: true,
+        lastChecked: new Date().toISOString(),
+        newMatches: 0,
+        createdAt: new Date().toISOString(),
+      }
+    );
+
+    return { success: true, data: savedSearch };
+  } catch (error: any) {
+    console.error("Error saving search:", error);
+    throw error;
+  }
+}
+
+// Get user's saved searches
+export async function getSavedSearches(userId: string) {
+  try {
+    const savedSearches = await databases.listDocuments(
+      config.databaseId!,
+      "saved_searches",
+      [
+        Query.equal("userId", userId),
+        Query.orderDesc("createdAt")
+      ]
+    );
+
+    return savedSearches.documents as SavedSearch[];
+  } catch (error: any) {
+    console.error("Error getting saved searches:", error);
+    return [];
+  }
+}
+
+// Update saved search new matches count
+export async function updateSavedSearchMatches(searchId: string, newMatches: number) {
+  try {
+    await databases.updateDocument(
+      config.databaseId!,
+      "saved_searches",
+      searchId,
+      {
+        newMatches,
+        lastChecked: new Date().toISOString(),
+      }
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating saved search matches:", error);
+    throw error;
+  }
+}
+
+// Delete saved search
+export async function deleteSavedSearch(searchId: string) {
+  try {
+    await databases.deleteDocument(
+      config.databaseId!,
+      "saved_searches",
+      searchId
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting saved search:", error);
+    throw error;
+  }
+}
+
+// Notification system
+export interface Notification {
+  $id: string;
+  userId: string;
+  type: 'property' | 'booking' | 'communication' | 'system' | 'location' | 'engagement';
+  title: string;
+  message: string;
+  data?: any;
+  isRead: boolean;
+  priority: 'low' | 'medium' | 'high';
+  createdAt: string;
+  readAt?: string;
+}
+
+export interface NotificationSettings {
+  $id: string;
+  userId: string;
+  propertyNotifications: boolean;
+  bookingNotifications: boolean;
+  communicationNotifications: boolean;
+  systemNotifications: boolean;
+  locationNotifications: boolean;
+  engagementNotifications: boolean;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Create a notification
+export async function createNotification({
+  userId,
+  type,
+  title,
+  message,
+  data,
+  priority = 'medium'
+}: {
+  userId: string;
+  type: 'property' | 'booking' | 'communication' | 'system' | 'location' | 'engagement';
+  title: string;
+  message: string;
+  data?: any;
+  priority?: 'low' | 'medium' | 'high';
+}) {
+  try {
+    const notification = await databases.createDocument(
+      config.databaseId!,
+      "notifications",
+      ID.unique(),
+      {
+        userId,
+        type,
+        title,
+        message,
+        data: data ? JSON.stringify(data) : "",
+        isRead: false,
+        priority,
+        createdAt: new Date().toISOString(),
+      }
+    );
+
+    return { success: true, data: notification };
+  } catch (error: any) {
+    console.error("Error creating notification:", error);
+    throw error;
+  }
+}
+
+// Get user notifications
+export async function getUserNotifications(userId: string, limit: number = 50) {
+  try {
+    const notifications = await databases.listDocuments(
+      config.databaseId!,
+      "notifications",
+      [
+        Query.equal("userId", userId),
+        Query.orderDesc("createdAt"),
+        Query.limit(limit)
+      ]
+    );
+
+    return notifications.documents as Notification[];
+  } catch (error: any) {
+    console.error("Error getting user notifications:", error);
+    return [];
+  }
+}
+
+// Mark notification as read
+export async function markNotificationAsRead(notificationId: string) {
+  try {
+    await databases.updateDocument(
+      config.databaseId!,
+      "notifications",
+      notificationId,
+      {
+        isRead: true,
+        readAt: new Date().toISOString(),
+      }
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking notification as read:", error);
+    throw error;
+  }
+}
+
+// Mark all notifications as read
+export async function markAllNotificationsAsRead(userId: string) {
+  try {
+    const unreadNotifications = await databases.listDocuments(
+      config.databaseId!,
+      "notifications",
+      [
+        Query.equal("userId", userId),
+        Query.equal("isRead", false)
+      ]
+    );
+
+    const updatePromises = unreadNotifications.documents.map(notification =>
+      databases.updateDocument(
+        config.databaseId!,
+        "notifications",
+        notification.$id,
+        {
+          isRead: true,
+          readAt: new Date().toISOString(),
+        }
+      )
+    );
+
+    await Promise.all(updatePromises);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking all notifications as read:", error);
+    throw error;
+  }
+}
+
+// Get notification settings
+export async function getNotificationSettings(userId: string) {
+  try {
+    const settings = await databases.listDocuments(
+      config.databaseId!,
+      "notification_settings",
+      [Query.equal("userId", userId)]
+    );
+
+    if (settings.documents.length > 0) {
+      return settings.documents[0] as NotificationSettings;
+    }
+
+    // Create default settings if none exist
+    const defaultSettings = await databases.createDocument(
+      config.databaseId!,
+      "notification_settings",
+      ID.unique(),
+      {
+        userId,
+        propertyNotifications: true,
+        bookingNotifications: true,
+        communicationNotifications: true,
+        systemNotifications: true,
+        locationNotifications: true,
+        engagementNotifications: true,
+        emailNotifications: true,
+        pushNotifications: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+    );
+
+    return defaultSettings as NotificationSettings;
+  } catch (error: any) {
+    console.error("Error getting notification settings:", error);
+    throw error;
+  }
+}
+
+// Update notification settings
+export async function updateNotificationSettings(userId: string, settings: Partial<NotificationSettings>) {
+  try {
+    const existingSettings = await getNotificationSettings(userId);
+    
+    await databases.updateDocument(
+      config.databaseId!,
+      "notification_settings",
+      existingSettings.$id,
+      {
+        ...settings,
+        updatedAt: new Date().toISOString(),
+      }
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating notification settings:", error);
+    throw error;
+  }
+}
+
+// Notification triggers
+export async function triggerPropertyNotifications(propertyId: string, property: any) {
+  try {
+    // Get all users who have saved this property
+    const savedProperties = await databases.listDocuments(
+      config.databaseId!,
+      "saved_properties",
+      [Query.equal("propertyId", propertyId)]
+    );
+
+    // Get all users with saved searches that match this property
+    const savedSearches = await databases.listDocuments(
+      config.databaseId!,
+      "saved_searches",
+      [Query.equal("isActive", true)]
+    );
+
+    const notifications = [];
+
+    // Notify users who saved this property about price changes
+    for (const savedProperty of savedProperties.documents) {
+      const userSettings = await getNotificationSettings(savedProperty.userId);
+      
+      if (userSettings.propertyNotifications) {
+        notifications.push(
+          createNotification({
+            userId: savedProperty.userId,
+            type: 'property',
+            title: 'Property Update',
+            message: `${property.name} has been updated`,
+            data: { propertyId, propertyName: property.name },
+            priority: 'medium'
+          })
+        );
+      }
+    }
+
+    // Notify users with matching saved searches
+    for (const search of savedSearches.documents) {
+      const userSettings = await getNotificationSettings(search.userId);
+      
+      if (userSettings.propertyNotifications && 
+          (search.propertyType === property.propertyType || search.propertyType === 'All') &&
+          property.price >= search.priceMin && 
+          property.price <= search.priceMax) {
+        
+        notifications.push(
+          createNotification({
+            userId: search.userId,
+            type: 'property',
+            title: 'New Property Match',
+            message: `New property matches your search: ${search.searchName}`,
+            data: { propertyId, searchId: search.$id, propertyName: property.name },
+            priority: 'high'
+          })
+        );
+
+        // Update search new matches count
+        await updateSavedSearchMatches(search.$id, search.newMatches + 1);
+      }
+    }
+
+    await Promise.all(notifications);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error triggering property notifications:", error);
+    throw error;
+  }
+}
+
+export async function triggerBookingNotifications(bookingId: string, booking: any, type: 'created' | 'confirmed' | 'cancelled' | 'reminder') {
+  try {
+    const userSettings = await getNotificationSettings(booking.userId);
+    
+    if (!userSettings.bookingNotifications) return { success: true };
+
+    let title, message;
+    switch (type) {
+      case 'created':
+        title = 'Booking Created';
+        message = `Your booking for ${booking.propertyName} has been created`;
+        break;
+      case 'confirmed':
+        title = 'Booking Confirmed';
+        message = `Your booking for ${booking.propertyName} has been confirmed`;
+        break;
+      case 'cancelled':
+        title = 'Booking Cancelled';
+        message = `Your booking for ${booking.propertyName} has been cancelled`;
+        break;
+      case 'reminder':
+        title = 'Booking Reminder';
+        message = `Your booking for ${booking.propertyName} is tomorrow`;
+        break;
+    }
+
+    await createNotification({
+      userId: booking.userId,
+      type: 'booking',
+      title,
+      message,
+      data: { bookingId, propertyName: booking.propertyName },
+      priority: type === 'reminder' ? 'high' : 'medium'
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error triggering booking notifications:", error);
+    throw error;
+  }
+}
+
+export async function triggerCommunicationNotifications(chatId: string, message: any, recipientId: string) {
+  try {
+    const userSettings = await getNotificationSettings(recipientId);
+    
+    if (!userSettings.communicationNotifications) return { success: true };
+
+    await createNotification({
+      userId: recipientId,
+      type: 'communication',
+      title: 'New Message',
+      message: `You have a new message from ${message.senderName}`,
+      data: { chatId, messageId: message.$id, senderName: message.senderName },
+      priority: 'high'
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error triggering communication notifications:", error);
+    throw error;
+  }
+}
+
+export async function triggerLocationNotifications(userId: string, location: string, nearbyProperties: any[]) {
+  try {
+    const userSettings = await getNotificationSettings(userId);
+    
+    if (!userSettings.locationNotifications || nearbyProperties.length === 0) return { success: true };
+
+    await createNotification({
+      userId,
+      type: 'location',
+      title: 'Properties Near You',
+      message: `Found ${nearbyProperties.length} properties near ${location}`,
+      data: { location, propertyCount: nearbyProperties.length, properties: nearbyProperties },
+      priority: 'medium'
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error triggering location notifications:", error);
+    throw error;
+  }
+}
+
+export async function triggerEngagementNotifications(userId: string, type: 'welcome' | 'profile_incomplete' | 'no_activity' | 'feature_suggestion') {
+  try {
+    const userSettings = await getNotificationSettings(userId);
+    
+    if (!userSettings.engagementNotifications) return { success: true };
+
+    let title, message, priority: 'low' | 'medium' | 'high' = 'low';
+    
+    switch (type) {
+      case 'welcome':
+        title = 'Welcome to Real Estate App!';
+        message = 'Complete your profile to get personalized property recommendations';
+        priority = 'high';
+        break;
+      case 'profile_incomplete':
+        title = 'Complete Your Profile';
+        message = 'Add more details to your profile for better property matches';
+        priority = 'medium';
+        break;
+      case 'no_activity':
+        title = 'Check Out New Properties';
+        message = 'We have new properties that might interest you';
+        priority = 'low';
+        break;
+      case 'feature_suggestion':
+        title = 'New Feature Available';
+        message = 'Try our new virtual tour feature for properties';
+        priority = 'low';
+        break;
+    }
+
+    await createNotification({
+      userId,
+      type: 'engagement',
+      title,
+      message,
+      data: { notificationType: type },
+      priority
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error triggering engagement notifications:", error);
+    throw error;
+  }
 }

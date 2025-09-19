@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -16,9 +16,10 @@ import {
 } from "react-native";
 
 import Filters from "@/components/Filters";
+import NotificationCenter from "@/components/NotificationCenter";
 import images from "@/constants/images";
 
-import { getLatestProperties, getProperties } from "@/lib/appwrite";
+import { getLatestProperties, getProperties, isPropertySaved, saveProperty, unsaveProperty } from "@/lib/appwrite";
 import { calculateDistance, filterPropertiesByDistance, geocodeSearchTerm, getSearchSuggestions } from "@/lib/geocoding";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
@@ -34,6 +35,8 @@ const Home = () => {
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchLocation, setSearchLocation] = useState<{latitude: number, longitude: number, placeName: string} | null>(null);
+  const [savedProperties, setSavedProperties] = useState<Set<string>>(new Set());
+  const [showNotifications, setShowNotifications] = useState(false);
   
   const { height: screenHeight } = Dimensions.get('window');
 
@@ -98,13 +101,54 @@ const Home = () => {
     return sortedProperties.slice(0, 20); // Limit to 20 properties
   }, [allProperties, searchLocation]);
 
-  // Debug logging
-  console.log("Latest properties:", latestProperties?.length || 0);
-  console.log("Popular properties:", popularProperties?.length || 0);
 
   const handleCardPress = (id: string) => {
     router.push(`/properties/${id}`);
   };
+
+  // Handle property save/unsave
+  const handleToggleSave = async (propertyId: string) => {
+    if (!user?.$id) return;
+    
+    try {
+      const isSaved = savedProperties.has(propertyId);
+      
+      if (isSaved) {
+        await unsaveProperty(propertyId, user.$id);
+        setSavedProperties(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(propertyId);
+          return newSet;
+        });
+      } else {
+        await saveProperty(propertyId, user.$id);
+        setSavedProperties(prev => new Set(prev).add(propertyId));
+      }
+    } catch (error) {
+      console.error('Error toggling save:', error);
+    }
+  };
+
+  // Check if properties are saved when they load
+  useEffect(() => {
+    const checkSavedProperties = async () => {
+      if (!user?.$id || !popularProperties) return;
+      
+      const savedChecks = await Promise.all(
+        popularProperties.map(property => 
+          isPropertySaved(property.$id, user.$id).then(isSaved => ({ id: property.$id, isSaved }))
+        )
+      );
+      
+      const savedSet = new Set(
+        savedChecks.filter(check => check.isSaved).map(check => check.id)
+      );
+      
+      setSavedProperties(savedSet);
+    };
+    
+    checkSavedProperties();
+  }, [user?.$id, popularProperties]);
 
   // Handle search input changes
   const handleSearchChange = (text: string) => {
@@ -227,7 +271,10 @@ const Home = () => {
             <View className="flex-row items-center gap-4 ml-auto">
               {/* Notification Button */}
               <View className="p-2 bg-white rounded-full shadow-md">
-                <TouchableOpacity className="relative">
+                <TouchableOpacity 
+                  className="relative"
+                  onPress={() => setShowNotifications(true)}
+                >
                   <Ionicons name="notifications-outline" size={24} color="#191D31" />
                   <View className="absolute -top-1 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
                 </TouchableOpacity>
@@ -408,11 +455,14 @@ const Home = () => {
                         </Text>
                       </View>
                       {/* Favorite Button */}
-                      <TouchableOpacity className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm">
+                      <TouchableOpacity 
+                        className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm"
+                        onPress={() => handleToggleSave(property.$id)}
+                      >
                         <Ionicons 
-                          name="heart-outline" 
+                          name={savedProperties.has(property.$id) ? "heart" : "heart-outline"} 
                           size={20} 
-                          color="#666876" 
+                          color={savedProperties.has(property.$id) ? "#FF6B6B" : "#666876"} 
                         />
                       </TouchableOpacity>
                     </View>
@@ -483,6 +533,12 @@ const Home = () => {
         </View>
       </ScrollView>
       </LinearGradient>
+
+      {/* Notification Center Modal */}
+      <NotificationCenter
+        visible={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
     </View>
   );
 };
