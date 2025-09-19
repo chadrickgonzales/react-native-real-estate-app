@@ -30,7 +30,6 @@ const Home = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<'rent' | 'sell'>('sell');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [isSeeding, setIsSeeding] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchLocation, setSearchLocation] = useState<{latitude: number, longitude: number, placeName: string} | null>(null);
@@ -206,30 +205,6 @@ const Home = () => {
     }).format(price);
   };
 
-  const handleSeedDatabase = async () => {
-    try {
-      setIsSeeding(true);
-      console.log("Starting database seeding...");
-      await seed();
-      console.log("Database seeding completed successfully!");
-      
-      // Refetch data after seeding
-      await refetchLatest({ 
-        propertyType: propertyTypeFilter, 
-        filter: selectedCategory 
-      });
-      await refetchPopular({ 
-        filter: selectedCategory, 
-        query: "", 
-        limit: 20, 
-        propertyType: propertyTypeFilter 
-      });
-    } catch (error) {
-      console.error("Error seeding database:", error);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
 
   return (

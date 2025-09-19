@@ -1,21 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { 
-  initializePushNotifications,
-  sendLocalNotification,
-  cancelNotification,
-  cancelAllNotifications,
-  getPendingNotifications,
-  clearBadge,
-  setBadgeCount,
-  addNotificationReceivedListener,
-  addNotificationResponseReceivedListener,
-  handleNotificationAction,
-  NotificationData,
-  PushToken,
-  NotificationTemplates
-} from './push-notifications';
+import { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { useGlobalContext } from './global-provider';
+import {
+    addNotificationReceivedListener,
+    addNotificationResponseReceivedListener,
+    cancelAllNotifications,
+    cancelNotification,
+    clearBadge,
+    getPendingNotifications,
+    handleNotificationAction,
+    initializePushNotifications,
+    NotificationData,
+    NotificationTemplates,
+    PushToken,
+    sendLocalNotification,
+    setBadgeCount
+} from './push-notifications';
 
 interface NotificationState {
   isInitialized: boolean;
@@ -51,9 +53,25 @@ export function useNotifications(): UseNotificationsReturn {
     badgeCount: 0
   });
 
+  // Check if running in Expo Go
+  const isExpoGo = Constants.appOwnership === 'expo';
+  
   // Initialize notifications
   const initialize = useCallback(async () => {
     try {
+      // Check if we're in Expo Go and on Android
+      if (isExpoGo && Platform.OS === 'android') {
+        console.warn('Push notifications are not supported in Expo Go on Android. Please use a development build for full functionality.');
+        setState(prev => ({
+          ...prev,
+          isInitialized: true,
+          pushToken: null,
+          permissions: 'denied',
+          pendingNotifications: []
+        }));
+        return;
+      }
+
       const pushToken = await initializePushNotifications();
       const { status } = await Notifications.getPermissionsAsync();
       const pending = await getPendingNotifications();
@@ -75,11 +93,17 @@ export function useNotifications(): UseNotificationsReturn {
       console.error('Failed to initialize notifications:', error);
       setState(prev => ({ ...prev, isInitialized: false }));
     }
-  }, [user]);
+  }, [user, isExpoGo]);
 
   // Send notification
   const sendNotificationHandler = useCallback(async (notification: NotificationData): Promise<string> => {
     try {
+      // Check if we're in Expo Go and on Android
+      if (isExpoGo && Platform.OS === 'android') {
+        console.warn('Push notifications are not supported in Expo Go on Android. Notification not sent.');
+        return 'expo-go-limited';
+      }
+
       const id = await sendLocalNotification(notification);
       await refreshPendingNotifications();
       return id;
@@ -87,7 +111,7 @@ export function useNotifications(): UseNotificationsReturn {
       console.error('Failed to send notification:', error);
       throw error;
     }
-  }, []);
+  }, [isExpoGo]);
 
   // Cancel notification
   const cancelNotificationHandler = useCallback(async (id: string): Promise<void> => {

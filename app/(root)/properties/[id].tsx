@@ -1,25 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
-    Dimensions,
-    FlatList,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import images from "@/constants/images";
 
 import { getPropertyById } from "@/lib/appwrite";
-import { createBooking, getAvailableBookingSlots, isTimeSlotAvailable } from "@/lib/booking";
+import { createBooking } from "@/lib/booking";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
+import { getPropertyReviewStats } from "@/lib/reviews";
 import { useAppwrite } from "@/lib/useAppwrite";
 
 const Property = () => {
@@ -30,6 +31,7 @@ const Property = () => {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
+  const [selectedEndDate, setSelectedEndDate] = useState<number | null>(null);
   const [showTimeSlots, setShowTimeSlots] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [showBookingConfirmation, setShowBookingConfirmation] = useState(false);
@@ -38,6 +40,10 @@ const Property = () => {
   const [isCreatingBooking, setIsCreatingBooking] = useState(false);
   const [guests, setGuests] = useState(1);
   const [specialRequests, setSpecialRequests] = useState("");
+  const [requestedDays, setRequestedDays] = useState<number>(1);
+  const [maxConsecutiveDays, setMaxConsecutiveDays] = useState<number>(0);
+  const [showAvailabilityDetails, setShowAvailabilityDetails] = useState(false);
+  const [reviewStats, setReviewStats] = useState<any>(null);
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -181,20 +187,68 @@ const Property = () => {
     return timeSlots;
   };
 
+  // Calculate maximum consecutive days available from a given date
+  const calculateMaxConsecutiveDays = (startDay: number, month: Date): number => {
+    let consecutiveDays = 0;
+    const year = month.getFullYear();
+    const monthIndex = month.getMonth();
+    
+    for (let i = 0; i < 30; i++) { // Check up to 30 days ahead
+      const checkDay = startDay + i;
+      const checkDate = new Date(year, monthIndex, checkDay);
+      
+      // Check if date is available and not booked
+      if (isDateAvailable(checkDay, month) && !isDateBooked(checkDay, month)) {
+        consecutiveDays++;
+      } else {
+        break;
+      }
+    }
+    
+    return consecutiveDays;
+  };
+
+  // Check if requested days are available and return blocked dates
+  const checkDaysAvailability = (startDay: number, requestedDays: number, month: Date) => {
+    const year = month.getFullYear();
+    const monthIndex = month.getMonth();
+    const blockedDates = [];
+    
+    for (let i = 0; i < requestedDays; i++) {
+      const checkDay = startDay + i;
+      const checkDate = new Date(year, monthIndex, checkDay);
+      
+      if (isDateBooked(checkDay, month)) {
+        blockedDates.push({
+          day: checkDay,
+          date: checkDate.toLocaleDateString('en-US', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+          })
+        });
+      }
+    }
+    
+    return {
+      isAvailable: blockedDates.length === 0,
+      blockedDates
+    };
+  };
+
   const handleDateClick = async (day: number) => {
     if (isDateAvailable(day, currentMonth) && !isDateBooked(day, currentMonth)) {
       setSelectedDate(day);
+      setSelectedEndDate(null);
       setShowTimeSlots(true);
       
-      // Fetch real available slots for the selected date
-      if (property) {
-        try {
-          const dateString = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-          const slots = await getAvailableBookingSlots(property.$id, dateString);
-          setAvailableSlots(slots);
-        } catch (error) {
-          console.error('Error fetching available slots:', error);
-        }
+      // Calculate maximum consecutive days available from this date
+      const maxDays = calculateMaxConsecutiveDays(day, currentMonth);
+      setMaxConsecutiveDays(maxDays);
+      
+      // Reset requested days if it exceeds available days
+      if (requestedDays > maxDays) {
+        setRequestedDays(Math.max(1, maxDays));
       }
     }
   };
@@ -202,7 +256,10 @@ const Property = () => {
   const closeTimeSlots = () => {
     setShowTimeSlots(false);
     setSelectedDate(null);
+    setSelectedEndDate(null);
     setSelectedTimeSlot(null);
+    setRequestedDays(1);
+    setMaxConsecutiveDays(0);
   };
 
   const handleTimeSlotSelect = (timeSlot: string) => {
@@ -212,23 +269,27 @@ const Property = () => {
   };
 
   const confirmBooking = async () => {
-    if (!user || !property || !selectedDate || !selectedTimeSlot) {
+    if (!user || !property || !selectedDate) {
       alert('Please complete all booking details');
+      return;
+    }
+
+    if (requestedDays > maxConsecutiveDays) {
+      alert(`Only ${maxConsecutiveDays} consecutive days available from this date. Please adjust your selection.`);
       return;
     }
 
     setIsCreatingBooking(true);
     
     try {
-      const dateString = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.toString().padStart(2, '0')}`;
+      const startDateString = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.toString().padStart(2, '0')}`;
       
-      // Check if slot is still available
-      const isAvailable = await isTimeSlotAvailable(property.$id, dateString, selectedTimeSlot);
-      if (!isAvailable) {
-        alert('This time slot is no longer available. Please select another time.');
-        return;
-      }
-
+      // Calculate end date based on requested days
+      const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDate);
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + requestedDays - 1);
+      const endDateString = `${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')}`;
+      
       // Create the booking
       const bookingData = {
         userId: user.$id,
@@ -240,24 +301,31 @@ const Property = () => {
         ownerName: property.ownerName || 'Property Owner',
         ownerEmail: property.contactEmail || 'owner@example.com',
         ownerPhone: property.contactPhone || 'N/A',
-        bookingDate: dateString,
-        bookingTime: selectedTimeSlot,
-        duration: 60,
-        totalAmount: property.price || 0,
-        currency: 'USD',
+        bookingDate: startDateString,
+        bookingTime: '3:00 PM', // Default check-in time
+        duration: requestedDays * 24 * 60, // Duration in minutes for multiple days
+        totalAmount: (property.price || 0) * requestedDays,
+        currency: 'PHP',
         guests,
-        specialRequests
+        specialRequests: `${specialRequests}\n\nBooking Period: ${requestedDays} day${requestedDays > 1 ? 's' : ''} (${startDateString} to ${endDateString})\nCheck-in: 3:00 PM | Checkout: 11:00 AM`
       };
 
       const result = await createBooking(bookingData);
       
       if (result.success) {
-        alert(`Booking confirmed!\n\nProperty: ${property.name}\nDate: ${currentMonth.toLocaleDateString('en-US', { month: 'long' })} ${selectedDate}, ${currentMonth.getFullYear()}\nTime: ${selectedTimeSlot}\n\nYou will receive a confirmation email shortly.`);
+        const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDate);
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + requestedDays - 1);
+        const dateRangeText = `${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+          
+        alert(`Booking confirmed!\n\nProperty: ${property.name}\nCheck-in: ${dateRangeText}\nDuration: ${requestedDays} day${requestedDays > 1 ? 's' : ''}\nCheck-in: 3:00 PM | Checkout: 11:00 AM\nTotal: ₱${bookingData.totalAmount.toLocaleString()}\n\nYou will receive a confirmation email shortly.`);
         
         // Close all modals and reset state
         setShowBookingConfirmation(false);
-        setSelectedTimeSlot(null);
         setSelectedDate(null);
+        setSelectedEndDate(null);
+        setRequestedDays(1);
+        setMaxConsecutiveDays(0);
         setGuests(1);
         setSpecialRequests("");
       }
@@ -271,9 +339,13 @@ const Property = () => {
 
   const cancelBooking = () => {
     setShowBookingConfirmation(false);
-    setSelectedTimeSlot(null);
-    // Return to time slots selection
-    setShowTimeSlots(true);
+    setSelectedDate(null);
+    setSelectedEndDate(null);
+    setRequestedDays(1);
+    setMaxConsecutiveDays(0);
+    setSpecialRequests("");
+    setGuests(1);
+    setMessageText("");
   };
 
   const { data: property, loading } = useAppwrite({
@@ -282,6 +354,31 @@ const Property = () => {
       id: id!,
     },
   });
+
+  // Load review stats when property is loaded
+  const loadReviewStats = async () => {
+    if (!id) return;
+    
+    try {
+      const stats = await getPropertyReviewStats(id);
+      setReviewStats(stats);
+    } catch (error) {
+      console.error('Error loading review stats:', error);
+      // Set default stats if no reviews exist
+      setReviewStats({
+        averageRating: 0,
+        totalReviews: 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      });
+    }
+  };
+
+  // Load review stats when property is available
+  React.useEffect(() => {
+    if (property) {
+      loadReviewStats();
+    }
+  }, [property]);
 
   const formatPrice = (price: number) => {
     if (!price || isNaN(price)) return '₱0';
@@ -519,15 +616,24 @@ const Property = () => {
 
           </View>
           
-          {/* Availability Calendar - Only for staycation-friendly rental properties */}
-          {property.propertyType === 'rent' && (property.type === 'Villa' || property.type === 'Townhomes') && (
+          {/* Availability Calendar - For staycation-friendly rental properties */}
+          {property.propertyType === 'rent' && (
+            // Show booking for properties that are suitable for short-term stays
+            property.type === 'Villa' || 
+            property.type === 'Townhomes' || 
+            property.type === 'House' && property.furnishedStatus === true ||
+            property.type === 'Apartment' && property.furnishedStatus === true ||
+            property.type === 'Condos' && property.furnishedStatus === true
+          ) && (
             <View className="bg-white mb-1 shadow-lg p-6">
               <View className="mb-4">
                 <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability for Booking</Text>
                 
+                
                 {/* Calendar Header */}
                 <View className="flex-row items-center justify-between mb-4">
                   <TouchableOpacity 
+                    activeOpacity={0.7}
                     onPress={() => navigateMonth('prev')}
                     className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center"
                   >
@@ -539,6 +645,7 @@ const Property = () => {
                   </Text>
                   
                   <TouchableOpacity 
+                    activeOpacity={0.7}
                     onPress={() => navigateMonth('next')}
                     className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center"
                   >
@@ -559,32 +666,49 @@ const Property = () => {
 
                   {/* Calendar Days */}
                   <View className="flex-row flex-wrap">
-                    {generateCalendarDays(currentMonth).map((day, index) => (
-                      <View key={index} className="w-[14.28%] aspect-square items-center justify-center">
-                        {day ? (
-                          <View className={`w-8 h-8 rounded-full items-center justify-center ${
-                            isDateBooked(day, currentMonth) 
-                              ? 'bg-red-100' 
-                              : 'bg-green-100'
-                          }`}>
-                            <Text className={`font-rubik text-sm ${
-                              isDateBooked(day, currentMonth) 
-                                ? 'text-red-600' 
-                                : 'text-green-600'
-                            }`}>
-                              {day}
-                            </Text>
-                          </View>
-                        ) : (
-                          <View className="w-8 h-8" />
-                        )}
-                      </View>
-                    ))}
+                    {generateCalendarDays(currentMonth).map((day, index) => {
+                      const isSelected = selectedDate === day;
+                      const isInRange = selectedDate && day && day > selectedDate && day < selectedDate + requestedDays;
+                      
+                      return (
+                        <View key={index} className="w-[14.28%] aspect-square items-center justify-center">
+                          {day ? (
+                            <TouchableOpacity 
+                              onPress={() => handleDateClick(day)}
+                              className={`w-8 h-8 rounded-full items-center justify-center ${
+                                isDateBooked(day, currentMonth) 
+                                  ? 'bg-red-100' 
+                                  : isSelected
+                                  ? 'bg-blue-500'
+                                  : isInRange
+                                  ? 'bg-blue-200'
+                                  : 'bg-green-100'
+                              }`}
+                              disabled={isDateBooked(day, currentMonth)}
+                            >
+                              <Text className={`font-rubik text-sm ${
+                                isDateBooked(day, currentMonth) 
+                                  ? 'text-red-600' 
+                                  : isSelected
+                                  ? 'text-white'
+                                  : isInRange
+                                  ? 'text-blue-800'
+                                  : 'text-green-600'
+                              }`}>
+                                {day}
+                              </Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <View className="w-8 h-8" />
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
                 </View>
 
                 {/* Legend */}
-                <View className="flex-row justify-center mt-4 space-x-8">
+                <View className="flex-row justify-center mt-4 space-x-4">
                   <View className="flex-row items-center">
                     <View className="w-3 h-3 bg-green-100 rounded-full mr-2" />
                     <Text className="text-gray-600 font-rubik text-xs">Available</Text>
@@ -592,6 +716,14 @@ const Property = () => {
                   <View className="flex-row items-center">
                     <View className="w-3 h-3 bg-red-100 rounded-full mr-2" />
                     <Text className="text-gray-600 font-rubik text-xs">Booked</Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <View className="w-3 h-3 bg-blue-500 rounded-full mr-2" />
+                    <Text className="text-gray-600 font-rubik text-xs">Check-in</Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <View className="w-3 h-3 bg-blue-200 rounded-full mr-2" />
+                    <Text className="text-gray-600 font-rubik text-xs">Stay Period</Text>
                   </View>
                 </View>
 
@@ -610,6 +742,14 @@ const Property = () => {
                       Minimum stay: 2 nights • Perfect for tourists & weekend trips
                     </Text>
                   </View>
+                  {property.furnishedStatus && (
+                    <View className="flex-row items-center mt-2">
+                      <Ionicons name="checkmark-circle" size={14} color="#8B5CF6" />
+                      <Text className="text-gray-600 font-rubik text-xs ml-2">
+                        Fully furnished • Ready for immediate stay
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </View>
@@ -722,8 +862,14 @@ const Property = () => {
           )}
 
 
-          {/* Basic Availability Info - For other rental properties */}
-          {property.propertyType === 'rent' && property.type !== 'Villa' && property.type !== 'Townhomes' && (
+          {/* Basic Availability Info - For long-term rental properties */}
+          {property.propertyType === 'rent' && !(
+            property.type === 'Villa' || 
+            property.type === 'Townhomes' || 
+            property.type === 'House' && property.furnishedStatus === true ||
+            property.type === 'Apartment' && property.furnishedStatus === true ||
+            property.type === 'Condos' && property.furnishedStatus === true
+          ) && (
             <View className="bg-white mb-1 shadow-lg p-6">
               <View className="mb-4">
                 <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability</Text>
@@ -759,7 +905,7 @@ const Property = () => {
                     <Text className="text-gray-600 font-rubik">
                       {property.furnishedStatus 
                         ? 'Furnished - Perfect for Tourists & Staycation' 
-                        : 'Unfurnished - Long-term Rental'
+                        : 'Unfurnished - Long-term Rental (6+ months)'
                       }
                     </Text>
                   </View>
@@ -1033,13 +1179,15 @@ const Property = () => {
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Ionicons
                     key={star}
-                    name="star"
+                    name={star <= Math.round(reviewStats?.averageRating || 0) ? "star" : "star-outline"}
                     size={16}
                     color="#F59E0B"
                   />
                 ))}
               </View>
-              <Text className="text-gray-600 font-rubik">4.8 (24 reviews)</Text>
+              <Text className="text-gray-600 font-rubik">
+                {reviewStats?.averageRating ? reviewStats.averageRating.toFixed(1) : '0.0'} ({reviewStats?.totalReviews || 0} reviews)
+              </Text>
             </View>
             
             <TouchableOpacity 
@@ -1055,7 +1203,7 @@ const Property = () => {
         </View>
       </ScrollView>
 
-      {/* Time Slots Popup Modal */}
+      {/* Check-in/Checkout Modal */}
       <Modal
         visible={showTimeSlots}
         transparent={true}
@@ -1066,7 +1214,7 @@ const Property = () => {
           <View className="bg-white rounded-2xl p-6 w-full max-w-sm">
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-lg font-rubik-bold text-gray-900">
-                Available Time Slots
+                Booking Details
               </Text>
               <TouchableOpacity onPress={closeTimeSlots}>
                 <Ionicons name="close" size={24} color="#6B7280" />
@@ -1077,42 +1225,128 @@ const Property = () => {
               {currentMonth.toLocaleDateString('en-US', { month: 'long' })} {selectedDate}, {currentMonth.getFullYear()}
             </Text>
 
-            <View className="flex-row flex-wrap gap-2 mb-4">
-              {availableSlots.length > 0 ? (
-                availableSlots.map((slot) => (
-                  <TouchableOpacity
-                    key={slot.time}
-                    onPress={() => slot.available && handleTimeSlotSelect(slot.time)}
-                    className={`px-4 py-2 rounded-lg border ${
-                      slot.available 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-gray-50 border-gray-200'
-                    }`}
-                    disabled={!slot.available}
-                  >
-                    <Text className={`font-rubik text-sm ${
-                      slot.available 
-                        ? 'text-green-700' 
-                        : 'text-gray-400'
-                    }`}>
-                      {slot.time}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <Text className="text-gray-500 font-rubik">Loading available slots...</Text>
-              )}
+            {/* Check-in/Checkout Times */}
+            <View className="mb-4">
+              <Text className="text-gray-900 font-rubik-bold text-base mb-3">Check-in & Checkout Times</Text>
+              
+              <View className="flex-row justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
+                <View className="flex-row items-center">
+                  <Ionicons name="log-in" size={16} color="#10B981" />
+                  <Text className="text-gray-700 font-rubik-medium ml-2">Check-in</Text>
+                </View>
+                <Text className="text-gray-900 font-rubik-bold">3:00 PM</Text>
+              </View>
+              
+              <View className="flex-row justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <View className="flex-row items-center">
+                  <Ionicons name="log-out" size={16} color="#EF4444" />
+                  <Text className="text-gray-700 font-rubik-medium ml-2">Checkout</Text>
+                </View>
+                <Text className="text-gray-900 font-rubik-bold">11:00 AM</Text>
+              </View>
             </View>
 
-            <View className="p-3 bg-blue-50 rounded-lg">
-              <View className="flex-row items-center">
-                <Ionicons name="information-circle" size={16} color="#3B82F6" />
-                <Text className="text-blue-600 font-rubik-medium ml-2 text-sm">Booking Info</Text>
+            {/* Days Selection */}
+            <View className="mb-4">
+              <Text className="text-gray-900 font-rubik-bold text-base mb-3">How many days will you be staying?</Text>
+              
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-gray-600 font-rubik">Number of days:</Text>
+                <View className="flex-row items-center">
+                  <TouchableOpacity
+                    onPress={() => setRequestedDays(Math.max(1, requestedDays - 1))}
+                    className="w-8 h-8 bg-gray-200 rounded-full items-center justify-center"
+                    disabled={requestedDays <= 1}
+                  >
+                    <Ionicons name="remove" size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                  <Text className="text-gray-900 font-rubik-bold text-lg mx-4 min-w-[40px] text-center">
+                    {requestedDays}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const newDays = requestedDays + 1;
+                      if (newDays <= maxConsecutiveDays) {
+                        setRequestedDays(newDays);
+                      } else {
+                        // Show message about blocked dates
+                        const availability = checkDaysAvailability(selectedDate!, newDays, currentMonth);
+                        if (!availability.isAvailable) {
+                          const blockedDatesText = availability.blockedDates
+                            .map(d => d.date)
+                            .join(', ');
+                          alert(`Cannot book ${newDays} days. The following dates are already booked:\n\n${blockedDatesText}\n\nMaximum available: ${maxConsecutiveDays} consecutive days from this date.`);
+                        }
+                      }
+                    }}
+                    className={`w-8 h-8 rounded-full items-center justify-center ${
+                      requestedDays >= maxConsecutiveDays 
+                        ? 'bg-red-200' 
+                        : 'bg-gray-200'
+                    }`}
+                  >
+                    <Ionicons 
+                      name="add" 
+                      size={16} 
+                      color={requestedDays >= maxConsecutiveDays ? "#EF4444" : "#6B7280"} 
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <Text className="text-gray-600 font-rubik text-xs mt-1">
-                Tap on an available time slot to book your viewing appointment
-              </Text>
+
+              {/* Availability Warning */}
+              {maxConsecutiveDays < requestedDays && (
+                <View className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-3">
+                  <View className="flex-row items-center">
+                    <Ionicons name="warning" size={16} color="#F59E0B" />
+                    <Text className="text-yellow-700 font-rubik-medium ml-2 text-sm">Limited Availability</Text>
+                  </View>
+                  <Text className="text-yellow-600 font-rubik text-xs mt-1">
+                    Only {maxConsecutiveDays} consecutive days available from this date. Some dates in your selection are already booked.
+                  </Text>
+                </View>
+              )}
+
+              {/* Booking Summary */}
+              <View className="p-3 bg-blue-50 rounded-lg">
+                <Text className="text-blue-700 font-rubik-bold text-sm mb-1">Booking Summary</Text>
+                <Text className="text-blue-600 font-rubik text-xs">
+                  {requestedDays} day{requestedDays > 1 ? 's' : ''} • Total: ${(property?.price || 0) * requestedDays}
+                </Text>
+              </View>
             </View>
+
+            {/* Continue Button */}
+            <TouchableOpacity
+              onPress={() => {
+                if (maxConsecutiveDays >= requestedDays) {
+                  setShowTimeSlots(false);
+                  setShowBookingConfirmation(true);
+                } else {
+                  // Show detailed availability information
+                  const availability = checkDaysAvailability(selectedDate!, requestedDays, currentMonth);
+                  if (!availability.isAvailable) {
+                    const blockedDatesText = availability.blockedDates
+                      .map(d => d.date)
+                      .join(', ');
+                    alert(`Cannot book ${requestedDays} days. The following dates are already booked:\n\n${blockedDatesText}\n\nMaximum available: ${maxConsecutiveDays} consecutive days from this date.`);
+                  }
+                }
+              }}
+              className={`py-3 px-4 rounded-lg ${
+                maxConsecutiveDays >= requestedDays 
+                  ? 'bg-blue-600' 
+                  : 'bg-red-500'
+              }`}
+            >
+              <Text className={`text-center font-rubik-bold ${
+                maxConsecutiveDays >= requestedDays 
+                  ? 'text-white' 
+                  : 'text-white'
+              }`}>
+                {maxConsecutiveDays >= requestedDays ? 'Continue to Booking' : 'Show Blocked Dates'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1145,9 +1379,9 @@ const Property = () => {
               </Text>
             </View>
 
-            {/* Appointment Details */}
+            {/* Booking Details */}
             <View className="mb-4">
-              <Text className="text-gray-900 font-rubik-bold text-base mb-3">Appointment Details</Text>
+              <Text className="text-gray-900 font-rubik-bold text-base mb-3">Booking Details</Text>
               
               <View className="flex-row items-center mb-2">
                 <Ionicons name="calendar" size={16} color="#3B82F6" />
@@ -1157,14 +1391,24 @@ const Property = () => {
                     month: 'long', 
                     day: 'numeric',
                     year: 'numeric'
-                  })}
+                  })} - {(() => {
+                    const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDate!);
+                    const endDate = new Date(startDate);
+                    endDate.setDate(startDate.getDate() + requestedDays - 1);
+                    return endDate.toLocaleDateString('en-US', { 
+                      weekday: 'long',
+                      month: 'long', 
+                      day: 'numeric',
+                      year: 'numeric'
+                    });
+                  })()}
                 </Text>
               </View>
               
               <View className="flex-row items-center mb-2">
                 <Ionicons name="time" size={16} color="#3B82F6" />
                 <Text className="text-gray-600 font-rubik ml-2">
-                  {selectedTimeSlot} (60 minutes)
+                  {requestedDays} day{requestedDays > 1 ? 's' : ''} • Check-in: 3:00 PM • Checkout: 11:00 AM
                 </Text>
               </View>
               
@@ -1172,6 +1416,13 @@ const Property = () => {
                 <Ionicons name="people" size={16} color="#3B82F6" />
                 <Text className="text-gray-600 font-rubik ml-2">
                   {guests} {guests === 1 ? 'Guest' : 'Guests'}
+                </Text>
+              </View>
+              
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="cash" size={16} color="#3B82F6" />
+                <Text className="text-gray-600 font-rubik ml-2">
+                  Total: ${(property?.price || 0) * requestedDays} PHP
                 </Text>
               </View>
             </View>
