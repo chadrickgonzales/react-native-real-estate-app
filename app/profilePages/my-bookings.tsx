@@ -1,83 +1,32 @@
 import images from '@/constants/images'
+import { Booking, cancelBooking, getUserBookings } from '@/lib/booking'
 import { useGlobalContext } from '@/lib/global-provider'
 import { createImageSource } from '@/lib/imageUtils'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-    Alert,
-    FlatList,
-    Image,
-    RefreshControl,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-// Mock booking data - replace with actual API calls
-const mockBookings = [
-  {
-    id: '1',
-    propertyId: 'prop1',
-    propertyName: 'Modern Downtown Apartment',
-    propertyImage: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=60&w=640&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    propertyAddress: '123 Main St, Downtown',
-    checkIn: '2024-01-15',
-    checkOut: '2024-01-20',
-    totalAmount: 1200,
-    status: 'confirmed',
-    bookingDate: '2024-01-10',
-    guests: 2,
-    propertyType: 'Apartment'
-  },
-  {
-    id: '2',
-    propertyId: 'prop2',
-    propertyName: 'Luxury Villa with Pool',
-    propertyImage: 'https://images.unsplash.com/photo-1605146768851-eda79da39897?q=60&w=640&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    propertyAddress: '456 Ocean View, Beachside',
-    checkIn: '2024-02-01',
-    checkOut: '2024-02-07',
-    totalAmount: 2800,
-    status: 'pending',
-    bookingDate: '2024-01-25',
-    guests: 4,
-    propertyType: 'Villa'
-  },
-  {
-    id: '3',
-    propertyId: 'prop3',
-    propertyName: 'Cozy Studio in City Center',
-    propertyImage: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=60&w=640&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    propertyAddress: '789 Central Ave, City Center',
-    checkIn: '2024-01-05',
-    checkOut: '2024-01-08',
-    totalAmount: 450,
-    status: 'completed',
-    bookingDate: '2023-12-20',
-    guests: 1,
-    propertyType: 'Studio'
-  }
-]
-
-interface Booking {
-  id: string
-  propertyId: string
-  propertyName: string
-  propertyImage: string
-  propertyAddress: string
-  checkIn: string
-  checkOut: string
-  totalAmount: number
-  status: 'confirmed' | 'pending' | 'cancelled' | 'completed'
-  bookingDate: string
-  guests: number
-  propertyType: string
+// Extended Booking interface for display purposes
+interface ExtendedBooking extends Booking {
+  propertyType?: string
+  bookingType?: 'viewing' | 'rental'
 }
+const { height: screenHeight } = Dimensions.get('window');
 
-const BookingCard = ({ booking }: { booking: Booking }) => {
+const BookingCard = ({ booking, onBookingUpdate }: { booking: ExtendedBooking, onBookingUpdate: () => void }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800'
@@ -112,33 +61,56 @@ const BookingCard = ({ booking }: { booking: Booking }) => {
         router.push(`/properties/${booking.propertyId}`)
         break
       case 'cancel':
+        const cancelTitle = booking.bookingType === 'viewing' ? 'Cancel Viewing' : 'Cancel Booking'
+        const cancelMessage = booking.bookingType === 'viewing' 
+          ? 'Are you sure you want to cancel this viewing appointment?' 
+          : 'Are you sure you want to cancel this booking?'
         Alert.alert(
-          'Cancel Booking',
-          'Are you sure you want to cancel this booking?',
+          cancelTitle,
+          cancelMessage,
           [
-            { text: 'Keep Booking', style: 'cancel' },
-            { text: 'Cancel Booking', style: 'destructive', onPress: () => handleCancelBooking(bookingId) }
+            { text: 'Keep', style: 'cancel' },
+            { text: 'Cancel', style: 'destructive', onPress: () => handleCancelBooking(bookingId) }
           ]
         )
         break
       case 'reschedule':
-        Alert.alert('Reschedule', 'Reschedule functionality will be implemented here.')
+        const rescheduleTitle = booking.bookingType === 'viewing' ? 'Reschedule Viewing' : 'Reschedule Booking'
+        Alert.alert(rescheduleTitle, 'Reschedule functionality will be implemented here.')
+        break
+      case 'review':
+        const reviewTitle = booking.bookingType === 'viewing' ? 'Leave Review' : 'Leave Review'
+        Alert.alert(reviewTitle, 'Review functionality will be implemented here.')
+        break
+      case 'rebook':
+        const rebookTitle = booking.bookingType === 'viewing' ? 'Book Viewing Again' : 'Book Again'
+        Alert.alert(rebookTitle, 'Rebook functionality will be implemented here.')
         break
     }
   }
 
-  const handleCancelBooking = (bookingId: string) => {
-    // Implement cancel booking logic
-    Alert.alert('Success', 'Booking cancelled successfully!')
+  const handleCancelBooking = async (bookingId: string) => {
+    try {
+      await cancelBooking(bookingId, 'Cancelled by user')
+      Alert.alert('Success', 'Booking cancelled successfully!')
+      onBookingUpdate() // Refresh the bookings list
+    } catch (error) {
+      console.error('Error cancelling booking:', error)
+      Alert.alert('Error', 'Failed to cancel booking. Please try again.')
+    }
   }
 
   return (
-    <View className="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-gray-100">
+    <View className="bg-white rounded-2xl p-2 mb-6 shadow-sm border border-gray-100">
       {/* Property Image and Status */}
       <View className="relative mb-6">
         <Image
           source={createImageSource(booking.propertyImage)}
-          className="w-full h-48 rounded-xl"
+          style={{ 
+            width: '100%', 
+            height: screenHeight * 0.35,
+            borderRadius: 16 
+          }}
           resizeMode="cover"
         />
         <View className={`absolute top-3 right-3 px-3 py-2 rounded-full flex-row items-center ${getStatusColor(booking.status)}`}>
@@ -166,57 +138,140 @@ const BookingCard = ({ booking }: { booking: Booking }) => {
 
       {/* Booking Details */}
       <View className="bg-accent-50 rounded-xl p-4 mb-6">
-        <View className="flex-row justify-between items-center mb-3">
-          <Text className="text-sm font-rubik-medium text-black-200">Check-in</Text>
-          <Text className="text-sm font-rubik-bold text-black-300">{formatDate(booking.checkIn)}</Text>
-        </View>
-        <View className="flex-row justify-between items-center mb-3">
-          <Text className="text-sm font-rubik-medium text-black-200">Check-out</Text>
-          <Text className="text-sm font-rubik-bold text-black-300">{formatDate(booking.checkOut)}</Text>
-        </View>
-        <View className="flex-row justify-between items-center mb-3">
-          <Text className="text-sm font-rubik-medium text-black-200">Guests</Text>
-          <Text className="text-sm font-rubik-bold text-black-300">{booking.guests} {booking.guests === 1 ? 'Guest' : 'Guests'}</Text>
-        </View>
-        <View className="flex-row justify-between items-center">
-          <Text className="text-sm font-rubik-medium text-black-200">Total Amount</Text>
-          <Text className="text-lg font-rubik-bold text-primary-300">${booking.totalAmount}</Text>
-        </View>
+        {booking.bookingType === 'viewing' ? (
+          // Viewing appointment details
+          <>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-sm font-rubik-medium text-black-200">Viewing Date</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{formatDate(booking.bookingDate)}</Text>
+            </View>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-sm font-rubik-medium text-black-200">Viewing Time</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{booking.bookingTime}</Text>
+            </View>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-sm font-rubik-medium text-black-200">Duration</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{booking.duration} minutes</Text>
+            </View>
+            <View className="flex-row justify-between items-center">
+              <Text className="text-sm font-rubik-medium text-black-200">Attendees</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{booking.guests} {booking.guests === 1 ? 'Person' : 'People'}</Text>
+            </View>
+          </>
+        ) : (
+          // Rental booking details
+          <>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-sm font-rubik-medium text-black-200">Check-in</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{formatDate(booking.bookingDate)}</Text>
+            </View>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-sm font-rubik-medium text-black-200">Check-out</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{formatDate(new Date(new Date(booking.bookingDate).getTime() + booking.duration * 60000).toISOString().split('T')[0])}</Text>
+            </View>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-sm font-rubik-medium text-black-200">Guests</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{booking.guests} {booking.guests === 1 ? 'Guest' : 'Guests'}</Text>
+            </View>
+            <View className="flex-row justify-between items-center">
+              <Text className="text-sm font-rubik-medium text-black-200">Total Amount</Text>
+              <Text className="text-lg font-rubik-bold text-primary-300">₱{booking.totalAmount.toLocaleString()}</Text>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Action Buttons */}
-      <View className="flex-row space-x-3">
+      <View className="flex-row gap-2">
         <TouchableOpacity
-          className="flex-1 bg-primary-100 py-4 rounded-xl active:bg-primary-200"
-          onPress={() => handleBookingAction('view', booking.id)}
+          className="flex-1 bg-primary-100 py-4 rounded-full active:bg-primary-200 shadow-md"
+          onPress={() => handleBookingAction('view', booking.$id)}
         >
-          <Text className="text-center text-primary-300 font-rubik-bold">View Property</Text>
+          <Text className="text-center text-primary-300 font-rubik-medium">View Property</Text>
         </TouchableOpacity>
         
         {booking.status === 'confirmed' && (
           <>
             <TouchableOpacity
-              className="flex-1 bg-yellow-100 py-4 rounded-xl active:bg-yellow-200"
-              onPress={() => handleBookingAction('reschedule', booking.id)}
+              className="flex-1 bg-yellow-100 py-4 rounded-full active:bg-yellow-200 shadow-lg"
+              onPress={() => handleBookingAction('reschedule', booking.$id)}
             >
-              <Text className="text-center text-yellow-800 font-rubik-bold">Reschedule</Text>
+              <Text className="text-center text-yellow-800 font-rubik-medium">
+                {booking.bookingType === 'viewing' ? 'Reschedule' : 'Reschedule'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className="flex-1 bg-red-100 py-4 rounded-xl active:bg-red-200"
-              onPress={() => handleBookingAction('cancel', booking.id)}
+              className="flex-1 bg-red-100 py-4 rounded-full active:bg-red-200 shadow-lg"
+              onPress={() => handleBookingAction('cancel', booking.$id)}
             >
-              <Text className="text-center text-red-800 font-rubik-bold">Cancel</Text>
+              <Text className="text-center text-red-800 font-rubik-medium">
+                {booking.bookingType === 'viewing' ? 'Cancel Viewing' : 'Cancel'}
+              </Text>
             </TouchableOpacity>
           </>
         )}
         
         {booking.status === 'pending' && (
-          <TouchableOpacity
-            className="flex-1 bg-red-100 py-4 rounded-xl active:bg-red-200"
-            onPress={() => handleBookingAction('cancel', booking.id)}
-          >
-            <Text className="text-center text-red-800 font-rubik-bold">Cancel</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              className="flex-1 bg-yellow-100 py-4 rounded-full active:bg-yellow-200 shadow-lg"
+              onPress={() => handleBookingAction('reschedule', booking.$id)}
+            >
+              <Text className="text-center text-yellow-800 font-rubik-medium">
+                {booking.bookingType === 'viewing' ? 'Reschedule' : 'Reschedule'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 bg-red-100 py-4 rounded-full active:bg-red-200 shadow-lg"
+              onPress={() => handleBookingAction('cancel', booking.$id)}
+            >
+              <Text className="text-center text-red-800 font-rubik-medium">
+                {booking.bookingType === 'viewing' ? 'Cancel Viewing' : 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+        
+        {booking.status === 'completed' && (
+          <>
+            <TouchableOpacity
+              className="flex-1 bg-blue-100 py-4 rounded-full active:bg-blue-200 shadow-lg"
+              onPress={() => handleBookingAction('review', booking.$id)}
+            >
+              <Text className="text-center text-blue-800 font-rubik-medium">
+                {booking.bookingType === 'viewing' ? 'Leave Review' : 'Leave Review'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 bg-green-100 py-4 rounded-full active:bg-green-200 shadow-lg"
+              onPress={() => handleBookingAction('rebook', booking.$id)}
+            >
+              <Text className="text-center text-green-800 font-rubik-medium">
+                {booking.bookingType === 'viewing' ? 'Book Again' : 'Book Again'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+        
+        {booking.status === 'cancelled' && (
+          <>
+            <TouchableOpacity
+              className="flex-1 bg-blue-100 py-4 rounded-full active:bg-blue-200 shadow-lg"
+              onPress={() => handleBookingAction('review', booking.$id)}
+            >
+              <Text className="text-center text-blue-800 font-rubik-medium">
+                {booking.bookingType === 'viewing' ? 'Leave Review' : 'Leave Review'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 bg-green-100 py-4 rounded-full active:bg-green-200 shadow-lg"
+              onPress={() => handleBookingAction('rebook', booking.$id)}
+            >
+              <Text className="text-center text-green-800 font-rubik-medium">
+                {booking.bookingType === 'viewing' ? 'Book Again' : 'Book Again'}
+              </Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
     </View>
@@ -224,44 +279,72 @@ const BookingCard = ({ booking }: { booking: Booking }) => {
 }
 
 export default function MyBookings() {
-  const [bookings, setBookings] = useState<Booking[]>(mockBookings)
+  const [bookings, setBookings] = useState<ExtendedBooking[]>([])
+  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedFilter, setSelectedFilter] = useState('all')
+  const [selectedTab, setSelectedTab] = useState<'viewing' | 'bookings'>('viewing')
   const { user } = useGlobalContext()
 
+  // Fetch bookings from database
+  const fetchBookings = async () => {
+    if (!user?.$id) return
+    
+    try {
+      setLoading(true)
+      const userBookings = await getUserBookings(user.$id)
+      
+      // Add display properties to bookings
+      const extendedBookings: ExtendedBooking[] = userBookings.map(booking => ({
+        ...booking,
+        propertyType: booking.propertyName.includes('Villa') ? 'Villa' : 
+                     booking.propertyName.includes('Studio') ? 'Studio' :
+                     booking.propertyName.includes('Condo') ? 'Condo' :
+                     booking.propertyName.includes('House') ? 'House' : 'Apartment',
+        bookingType: booking.totalAmount > 0 ? 'rental' : 'viewing'
+      }))
+      
+      setBookings(extendedBookings)
+    } catch (error) {
+      console.error('Error fetching bookings:', error)
+      Alert.alert('Error', 'Failed to load bookings. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load bookings on component mount
+  useEffect(() => {
+    fetchBookings()
+  }, [user?.$id])
+
   const filters = [
-    { key: 'all', label: 'All Bookings' },
+    { key: 'all', label: selectedTab === 'viewing' ? 'All Viewings' : 'All Bookings' },
     { key: 'confirmed', label: 'Confirmed' },
     { key: 'pending', label: 'Pending' },
     { key: 'completed', label: 'Completed' },
     { key: 'cancelled', label: 'Cancelled' }
   ]
 
-  const filteredBookings = bookings.filter(booking => 
-    selectedFilter === 'all' || booking.status === selectedFilter
-  )
+  const filteredBookings = bookings.filter(booking => {
+    // First filter by tab selection
+    if (selectedTab === 'viewing' && booking.bookingType !== 'viewing') return false
+    if (selectedTab === 'bookings' && booking.bookingType !== 'rental') return false
+    
+    // Then filter by status if not 'all'
+    if (selectedFilter === 'all') return true
+    return booking.status === selectedFilter
+  })
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true)
-    // Simulate API call
-    setTimeout(() => {
-      setRefreshing(false)
-    }, 1000)
+    await fetchBookings()
+    setRefreshing(false)
   }
 
-  const getBookingStats = () => {
-    const total = bookings.length
-    const confirmed = bookings.filter(b => b.status === 'confirmed').length
-    const pending = bookings.filter(b => b.status === 'pending').length
-    const completed = bookings.filter(b => b.status === 'completed').length
-
-    return { total, confirmed, pending, completed }
-  }
-
-  const stats = getBookingStats()
 
   return (
-    <SafeAreaView className="h-full bg-white">
+    <SafeAreaView className="h-full bg-background-100">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-32 px-7"
@@ -280,43 +363,60 @@ export default function MyBookings() {
           <View className="w-10" />
         </View>
 
-        {/* Booking Stats */}
-        <View className="mt-6 bg-gradient-to-b from-primary-50 to-white rounded-2xl p-6 mb-6">
-          <Text className="text-xl font-rubik-bold text-black-300 mb-6">Booking Overview</Text>
-          <View className="flex-row justify-between">
-            <View className="items-center">
-              <Text className="text-2xl font-rubik-bold text-primary-300">{stats.total}</Text>
-              <Text className="text-sm font-rubik text-black-200">Total</Text>
-            </View>
-            <View className="items-center">
-              <Text className="text-2xl font-rubik-bold text-green-600">{stats.confirmed}</Text>
-              <Text className="text-sm font-rubik text-black-200">Confirmed</Text>
-            </View>
-            <View className="items-center">
-              <Text className="text-2xl font-rubik-bold text-yellow-600">{stats.pending}</Text>
-              <Text className="text-sm font-rubik text-black-200">Pending</Text>
-            </View>
-            <View className="items-center">
-              <Text className="text-2xl font-rubik-bold text-blue-600">{stats.completed}</Text>
-              <Text className="text-sm font-rubik text-black-200">Completed</Text>
-            </View>
+        {/* Segmented Control */}
+        <View className="bg-white rounded-full p-2 mb-2">
+          <View className="flex-row">
+            <TouchableOpacity
+              className={`flex-1 py-3 rounded-full mr-2 ${
+                selectedTab === 'viewing' 
+                  ?  "bg-primary-300"
+                  : "bg-background-100"
+              }`}
+              onPress={() => setSelectedTab('viewing')}
+            >
+              <Text className={`text-center font-rubik-bold ${
+                selectedTab === 'viewing' 
+                  ? "text-white"
+                    : "text-gray-600"
+              }`}>
+                Viewing
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className={`flex-1 py-3 rounded-full ${
+                selectedTab === 'bookings' 
+                  ? "bg-primary-300"
+                  : "bg-background-100"
+              }`}
+              onPress={() => setSelectedTab('bookings')}
+            >
+              <Text className={`text-center font-rubik-bold ${
+                selectedTab === 'bookings' 
+                  ? "text-white"
+                    : "text-gray-600"
+              }`}>
+                Bookings
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
+
         {/* Filter Tabs */}
-        <View className="mb-6">
+        <View className="mb-6 bg-white rounded-full p-2">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingRight: 20 }}
+            className="rounded-full"
           >
             {filters.map((filter) => (
               <TouchableOpacity
                 key={filter.key}
                 className={`px-4 py-3 rounded-full mr-3 ${
                   selectedFilter === filter.key
-                    ? 'bg-primary-300'
-                    : 'bg-accent-100 border border-gray-200'
+                    ? "bg-primary-300"
+                  : "bg-background-100"
                 }`}
                 onPress={() => setSelectedFilter(filter.key)}
               >
@@ -334,37 +434,47 @@ export default function MyBookings() {
           </ScrollView>
         </View>
 
-        {/* Bookings List */}
-        {filteredBookings.length > 0 ? (
-          <FlatList
-            data={filteredBookings}
-            renderItem={({ item }) => <BookingCard booking={item} />}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          />
-        ) : (
+        {/* Loading State */}
+        {loading ? (
           <View className="items-center py-12">
-            <Image
-              source={images.noResult}
-              className="w-48 h-48 mb-6"
-              resizeMode="contain"
-            />
-            <Text className="text-xl font-rubik-bold text-black-300 mb-2">No Bookings Found</Text>
-            <Text className="text-base font-rubik text-black-200 text-center mb-6">
-              {selectedFilter === 'all' 
-                ? "You haven't made any bookings yet."
-                : `No ${selectedFilter} bookings found.`
-              }
-            </Text>
-            <TouchableOpacity
-              className="bg-primary-300 px-6 py-4 rounded-xl active:bg-primary-400"
-              onPress={() => router.push('/(root)/(tabs)')}
-            >
-              <Text className="text-white font-rubik-bold">Explore Properties</Text>
-            </TouchableOpacity>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text className="text-base font-rubik text-black-200 mt-4">Loading bookings...</Text>
           </View>
+        ) : (
+          /* Bookings List */
+          filteredBookings.length > 0 ? (
+            <FlatList
+              data={filteredBookings}
+              renderItem={({ item }) => <BookingCard booking={item} onBookingUpdate={fetchBookings} />}
+              keyExtractor={(item) => item.$id}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
+              contentContainerStyle={{ paddingBottom: 20 }}
+            />
+          ) : (
+            <View className="items-center py-12">
+              <Image
+                source={images.noResult}
+                className="w-48 h-48 mb-6"
+                resizeMode="contain"
+              />
+              <Text className="text-xl font-rubik-bold text-black-300 mb-2">
+                {selectedTab === 'viewing' ? 'No Viewing Appointments Found' : 'No Bookings Found'}
+              </Text>
+              <Text className="text-base font-rubik text-black-200 text-center mb-6">
+                {selectedTab === 'viewing' 
+                  ? "You haven't scheduled any viewing appointments yet."
+                  : "You haven't made any property bookings yet."
+                }
+              </Text>
+              <TouchableOpacity
+                className="bg-primary-300 px-6 py-4 rounded-xl active:bg-primary-400"
+                onPress={() => router.push('/(root)/(tabs)')}
+              >
+                <Text className="text-white font-rubik-bold">Explore Properties</Text>
+              </TouchableOpacity>
+            </View>
+          )
         )}
       </ScrollView>
     </SafeAreaView>

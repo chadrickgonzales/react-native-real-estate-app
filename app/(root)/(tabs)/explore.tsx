@@ -12,7 +12,7 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 
 
 // Custom Property Marker Component
-const PropertyMarker = ({ property, onPress }: { property: any; onPress: (property: any) => void }) => {
+const PropertyMarker = ({ property, onPress, isSelected = false }: { property: any; onPress: (property: any) => void; isSelected?: boolean }) => {
   const getPropertyIcon = (propertyType: string) => {
     switch (propertyType?.toLowerCase()) {
       case 'house':
@@ -77,18 +77,27 @@ const PropertyMarker = ({ property, onPress }: { property: any; onPress: (proper
     >
       <View className="items-center justify-center">
         <View 
-          className="w-8 h-8 rounded-full items-center justify-center border-2 border-white shadow-lg"
-          style={{ backgroundColor: getPropertyColor(property.type) }}
+          className={`${isSelected ? 'w-12 h-12' : 'w-8 h-8'} rounded-full items-center justify-center border-2 border-white shadow-lg`}
+          style={{ 
+            backgroundColor: isSelected ? '#EF4444' : getPropertyColor(property.type),
+            borderColor: isSelected ? '#DC2626' : 'white',
+            borderWidth: isSelected ? 3 : 2
+          }}
         >
           <Ionicons 
-            name={getPropertyIcon(property.type)} 
-            size={16} 
+            name={isSelected ? 'star' : getPropertyIcon(property.type)} 
+            size={isSelected ? 20 : 16} 
             color="white" 
           />
         </View>
         <View 
-          className="w-0 h-0 border-l-2 border-r-2 border-t-3 border-l-transparent border-r-transparent -mt-px shadow-sm"
-          style={{ borderTopColor: getPropertyColor(property.type) }}
+          className={`w-0 h-0 border-l-2 border-r-2 border-t-3 border-l-transparent border-r-transparent -mt-px shadow-sm`}
+          style={{ 
+            borderTopColor: isSelected ? '#EF4444' : getPropertyColor(property.type),
+            borderLeftWidth: isSelected ? 3 : 2,
+            borderRightWidth: isSelected ? 3 : 2,
+            borderTopWidth: isSelected ? 4 : 3
+          }}
         />
       </View>
     </Marker>
@@ -1302,6 +1311,7 @@ const Explore = () => {
               key={`property-${property.$id || index}`}
               property={property}
               onPress={() => handlePropertyPress(property)}
+              isSelected={selectedProperty && selectedProperty.$id === property.$id}
             />
           ))}
 

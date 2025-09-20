@@ -39,22 +39,48 @@ async function migratePropertyOwners() {
     
     console.log(`📋 Found ${properties.documents.length} properties to migrate`);
     
-    // Update each property with a default owner ID
-    // For existing properties, we'll use a default owner ID
-    // In a real app, you'd need to determine the actual owner
-    const defaultOwnerId = "68c244b4001a2b84bf26"; // Your user ID
+    // Get the first user from the users collection to use as default owner
+    let defaultOwnerId = null;
+    try {
+      const users = await databases.listDocuments(
+        config.databaseId,
+        "users", // Assuming users collection is named "users"
+        [Query.limit(1)]
+      );
+      
+      if (users.documents.length > 0) {
+        defaultOwnerId = users.documents[0].$id;
+        console.log(`👤 Using user as default owner: ${users.documents[0].userName || users.documents[0].$id}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not fetch users, will use property owner info instead');
+    }
     
     for (const property of properties.documents) {
       try {
-        await databases.updateDocument(
-          config.databaseId,
-          config.propertiesCollectionId,
-          property.$id,
-          {
-            propertyOwnerId: defaultOwnerId
+        // Only update if property doesn't have a valid ownerId
+        if (!property.ownerId || property.ownerId.startsWith('owner_')) {
+          const updateData = {};
+          
+          if (defaultOwnerId) {
+            updateData.propertyOwnerId = defaultOwnerId;
+            updateData.ownerId = defaultOwnerId;
+          } else {
+            // If no user found, keep the existing owner info but mark as seed data
+            updateData.propertyOwnerId = property.ownerId || `owner_${property.$id}`;
+            updateData.ownerId = property.ownerId || `owner_${property.$id}`;
           }
-        );
-        console.log(`✅ Updated property: ${property.name || property.$id}`);
+          
+          await databases.updateDocument(
+            config.databaseId,
+            config.propertiesCollectionId,
+            property.$id,
+            updateData
+          );
+          console.log(`✅ Updated property: ${property.name || property.$id}`);
+        } else {
+          console.log(`⏭️ Skipping property with valid owner: ${property.name || property.$id}`);
+        }
       } catch (error) {
         console.error(`❌ Failed to update property ${property.$id}:`, error.message);
       }

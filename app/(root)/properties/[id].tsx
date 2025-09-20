@@ -2,25 +2,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
-  Dimensions,
-  FlatList,
-  Image,
-  Modal,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Dimensions,
+    FlatList,
+    Image,
+    Modal,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import images from "@/constants/images";
 
+import ReviewForm from "@/components/ReviewForm";
 import { getPropertyById } from "@/lib/appwrite";
 import { createBooking } from "@/lib/booking";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
-import { getPropertyReviewStats } from "@/lib/reviews";
+import { createPropertyReview, getPropertyReviewStats } from "@/lib/reviews";
 import { useAppwrite } from "@/lib/useAppwrite";
 
 const Property = () => {
@@ -44,6 +45,8 @@ const Property = () => {
   const [maxConsecutiveDays, setMaxConsecutiveDays] = useState<number>(0);
   const [showAvailabilityDetails, setShowAvailabilityDetails] = useState(false);
   const [reviewStats, setReviewStats] = useState<any>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -240,15 +243,25 @@ const Property = () => {
     if (isDateAvailable(day, currentMonth) && !isDateBooked(day, currentMonth)) {
       setSelectedDate(day);
       setSelectedEndDate(null);
-      setShowTimeSlots(true);
       
-      // Calculate maximum consecutive days available from this date
-      const maxDays = calculateMaxConsecutiveDays(day, currentMonth);
-      setMaxConsecutiveDays(maxDays);
-      
-      // Reset requested days if it exceeds available days
-      if (requestedDays > maxDays) {
-        setRequestedDays(Math.max(1, maxDays));
+      // For sale properties (viewing), show time slots
+      if (property?.propertyType === 'sell') {
+        setShowTimeSlots(true);
+        // Generate time slots for viewing
+        const timeSlots = generateTimeSlots(day);
+        setAvailableSlots(timeSlots);
+      } else {
+        // For rental properties (booking), show booking modal
+        setShowTimeSlots(true);
+        
+        // Calculate maximum consecutive days available from this date
+        const maxDays = calculateMaxConsecutiveDays(day, currentMonth);
+        setMaxConsecutiveDays(maxDays);
+        
+        // Reset requested days if it exceeds available days
+        if (requestedDays > maxDays) {
+          setRequestedDays(Math.max(1, maxDays));
+        }
       }
     }
   };
@@ -318,7 +331,16 @@ const Property = () => {
         endDate.setDate(startDate.getDate() + requestedDays - 1);
         const dateRangeText = `${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
           
-        alert(`Booking confirmed!\n\nProperty: ${property.name}\nCheck-in: ${dateRangeText}\nDuration: ${requestedDays} day${requestedDays > 1 ? 's' : ''}\nCheck-in: 3:00 PM | Checkout: 11:00 AM\nTotal: ₱${bookingData.totalAmount.toLocaleString()}\n\nYou will receive a confirmation email shortly.`);
+        if (property?.propertyType === 'sell') {
+          alert(`Viewing appointment confirmed!\n\nProperty: ${property.name}\nDate: ${currentMonth.toLocaleDateString('en-US', { 
+            weekday: 'long',
+            month: 'long', 
+            day: 'numeric',
+            year: 'numeric'
+          })}\nTime: ${selectedTimeSlot}\n\nYou will receive a confirmation email shortly.`);
+        } else {
+          alert(`Booking confirmed!\n\nProperty: ${property.name}\nCheck-in: ${dateRangeText}\nDuration: ${requestedDays} day${requestedDays > 1 ? 's' : ''}\nCheck-in: 3:00 PM | Checkout: 11:00 AM\nTotal: ₱${bookingData.totalAmount.toLocaleString()}\n\nYou will receive a confirmation email shortly.`);
+        }
         
         // Close all modals and reset state
         setShowBookingConfirmation(false);
@@ -379,6 +401,34 @@ const Property = () => {
       loadReviewStats();
     }
   }, [property]);
+
+  // Handle review submission
+  const handleSubmitReview = async (reviewData: { rating: number; title: string; comment: string }) => {
+    if (!user || !id) return;
+    
+    setSubmittingReview(true);
+    
+    try {
+      await createPropertyReview({
+        userId: user.$id,
+        userName: user.userName || 'Anonymous',
+        userAvatar: user.avatar,
+        propertyId: id,
+        propertyName: property?.name || 'Property',
+        rating: reviewData.rating,
+        title: reviewData.title,
+        comment: reviewData.comment
+      });
+      
+      setShowReviewForm(false);
+      await loadReviewStats(); // Refresh review stats
+    } catch (error: any) {
+      console.error('Error submitting review:', error);
+      alert(error.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const formatPrice = (price: number) => {
     if (!price || isNaN(price)) return '₱0';
@@ -609,6 +659,50 @@ const Property = () => {
                 >
                   <Text className="text-blue-600 font-rubik-medium">
                     {showFullDescription ? 'Show less' : 'Show more'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Reviews Section */}
+            <View className="mb-6 bg-white rounded-2xl p-4 border border-gray-200">
+              {/* Reviews Header */}
+              <View className="flex-row items-center mb-4">
+                <Text className="text-black font-rubik-medium text-base">Reviews</Text>
+                <TouchableOpacity 
+                  onPress={() => router.push(`/property-reviews?id=${id}`)}
+                  className="flex-row items-center ml-auto"
+                >
+                  <Text className="text-blue-500 font-rubik-medium mr-1">View All</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Rating Display */}
+              <View className="flex-row items-center mb-4">
+                <View className="flex-row mr-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={star <= Math.round(reviewStats?.averageRating || 0) ? "star" : "star-outline"}
+                      size={16}
+                      color="#F59E0B"
+                    />
+                  ))}
+                </View>
+                <Text className="text-gray-600 font-rubik">
+                  {reviewStats?.averageRating ? reviewStats.averageRating.toFixed(1) : '0.0'} ({reviewStats?.totalReviews || 0} reviews)
+                </Text>
+              </View>
+              
+              {/* Write Review Input */}
+              {user && (
+                <TouchableOpacity 
+                  className="w-full bg-gray-100 rounded-full px-4 py-4 border border-gray-300"
+                  onPress={() => setShowReviewForm(true)}
+                >
+                  <Text className="text-gray-500 font-rubik">
+                    Write Review
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1161,49 +1255,11 @@ const Property = () => {
             <Text className="text-purple-600 font-rubik-bold ml-2">Explore The Property</Text>
           </TouchableOpacity>
 
-          {/* Reviews Section */}
-          <View className="bg-white shadow-lg p-6 mb-1">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-lg font-rubik-bold text-gray-900">Reviews</Text>
-              <TouchableOpacity 
-                onPress={() => router.push(`/property-reviews?id=${id}`)}
-                className="flex-row items-center"
-              >
-                <Text className="text-blue-500 font-rubik-medium mr-1">View All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
-              </TouchableOpacity>
-            </View>
-            
-            <View className="flex-row items-center mb-3">
-              <View className="flex-row mr-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Ionicons
-                    key={star}
-                    name={star <= Math.round(reviewStats?.averageRating || 0) ? "star" : "star-outline"}
-                    size={16}
-                    color="#F59E0B"
-                  />
-                ))}
-              </View>
-              <Text className="text-gray-600 font-rubik">
-                {reviewStats?.averageRating ? reviewStats.averageRating.toFixed(1) : '0.0'} ({reviewStats?.totalReviews || 0} reviews)
-              </Text>
-            </View>
-            
-            <TouchableOpacity 
-              className="bg-gray-100 rounded-lg p-3"
-              onPress={() => router.push(`/property-reviews?id=${id}`)}
-            >
-              <Text className="text-gray-600 font-rubik text-center">
-                View all reviews and ratings
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
         </View>
       </ScrollView>
 
-      {/* Check-in/Checkout Modal */}
+      {/* Time Slots / Booking Modal */}
       <Modal
         visible={showTimeSlots}
         transparent={true}
@@ -1214,7 +1270,7 @@ const Property = () => {
           <View className="bg-white rounded-2xl p-6 w-full max-w-sm">
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-lg font-rubik-bold text-gray-900">
-                Booking Details
+                {property?.propertyType === 'sell' ? 'Select Viewing Time' : 'Booking Details'}
               </Text>
               <TouchableOpacity onPress={closeTimeSlots}>
                 <Ionicons name="close" size={24} color="#6B7280" />
@@ -1225,9 +1281,51 @@ const Property = () => {
               {currentMonth.toLocaleDateString('en-US', { month: 'long' })} {selectedDate}, {currentMonth.getFullYear()}
             </Text>
 
-            {/* Check-in/Checkout Times */}
-            <View className="mb-4">
-              <Text className="text-gray-900 font-rubik-bold text-base mb-3">Check-in & Checkout Times</Text>
+            {/* Viewing Time Slots for Sale Properties */}
+            {property?.propertyType === 'sell' && (
+              <View className="mb-4">
+                <Text className="text-gray-900 font-rubik-bold text-base mb-3">Available Time Slots</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {availableSlots.map((slot, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => handleTimeSlotSelect(slot.time)}
+                      className={`px-4 py-3 rounded-lg border ${
+                        slot.available 
+                          ? 'bg-green-50 border-green-200' 
+                          : 'bg-red-50 border-red-200'
+                      }`}
+                      disabled={!slot.available}
+                    >
+                      <Text className={`font-rubik ${
+                        slot.available 
+                          ? 'text-green-700' 
+                          : 'text-red-500'
+                      }`}>
+                        {slot.time}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                <View className="mt-3 p-3 bg-blue-50 rounded-lg">
+                  <Text className="text-blue-600 font-rubik-bold text-sm mb-1">Viewing Information</Text>
+                  <Text className="text-blue-500 font-rubik text-xs">
+                    • Each viewing lasts 30-60 minutes
+                  </Text>
+                  <Text className="text-blue-500 font-rubik text-xs">
+                    • You'll receive confirmation details via email
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Booking Details for Rental Properties */}
+            {property?.propertyType === 'rent' && (
+              <>
+                {/* Check-in/Checkout Times */}
+                <View className="mb-4">
+                  <Text className="text-gray-900 font-rubik-bold text-base mb-3">Check-in & Checkout Times</Text>
               
               <View className="flex-row justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
                 <View className="flex-row items-center">
@@ -1316,37 +1414,39 @@ const Property = () => {
               </View>
             </View>
 
-            {/* Continue Button */}
-            <TouchableOpacity
-              onPress={() => {
-                if (maxConsecutiveDays >= requestedDays) {
-                  setShowTimeSlots(false);
-                  setShowBookingConfirmation(true);
-                } else {
-                  // Show detailed availability information
-                  const availability = checkDaysAvailability(selectedDate!, requestedDays, currentMonth);
-                  if (!availability.isAvailable) {
-                    const blockedDatesText = availability.blockedDates
-                      .map(d => d.date)
-                      .join(', ');
-                    alert(`Cannot book ${requestedDays} days. The following dates are already booked:\n\n${blockedDatesText}\n\nMaximum available: ${maxConsecutiveDays} consecutive days from this date.`);
-                  }
-                }
-              }}
-              className={`py-3 px-4 rounded-lg ${
-                maxConsecutiveDays >= requestedDays 
-                  ? 'bg-blue-600' 
-                  : 'bg-red-500'
-              }`}
-            >
-              <Text className={`text-center font-rubik-bold ${
-                maxConsecutiveDays >= requestedDays 
-                  ? 'text-white' 
-                  : 'text-white'
-              }`}>
-                {maxConsecutiveDays >= requestedDays ? 'Continue to Booking' : 'Show Blocked Dates'}
-              </Text>
-            </TouchableOpacity>
+                {/* Continue Button */}
+                <TouchableOpacity
+                  onPress={() => {
+                    if (maxConsecutiveDays >= requestedDays) {
+                      setShowTimeSlots(false);
+                      setShowBookingConfirmation(true);
+                    } else {
+                      // Show detailed availability information
+                      const availability = checkDaysAvailability(selectedDate!, requestedDays, currentMonth);
+                      if (!availability.isAvailable) {
+                        const blockedDatesText = availability.blockedDates
+                          .map(d => d.date)
+                          .join(', ');
+                        alert(`Cannot book ${requestedDays} days. The following dates are already booked:\n\n${blockedDatesText}\n\nMaximum available: ${maxConsecutiveDays} consecutive days from this date.`);
+                      }
+                    }
+                  }}
+                  className={`py-3 px-4 rounded-lg ${
+                    maxConsecutiveDays >= requestedDays 
+                      ? 'bg-blue-600' 
+                      : 'bg-red-500'
+                  }`}
+                >
+                  <Text className={`text-center font-rubik-bold ${
+                    maxConsecutiveDays >= requestedDays 
+                      ? 'text-white' 
+                      : 'text-white'
+                  }`}>
+                    {maxConsecutiveDays >= requestedDays ? 'Continue to Booking' : 'Show Blocked Dates'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -1362,7 +1462,7 @@ const Property = () => {
           <View className="bg-white rounded-2xl p-6 w-full max-w-sm">
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-lg font-rubik-bold text-gray-900">
-                Confirm Viewing Appointment
+                {property?.propertyType === 'sell' ? 'Confirm Viewing Appointment' : 'Confirm Booking'}
               </Text>
               <TouchableOpacity onPress={cancelBooking}>
                 <Ionicons name="close" size={24} color="#6B7280" />
@@ -1379,9 +1479,11 @@ const Property = () => {
               </Text>
             </View>
 
-            {/* Booking Details */}
+            {/* Booking/Viewing Details */}
             <View className="mb-4">
-              <Text className="text-gray-900 font-rubik-bold text-base mb-3">Booking Details</Text>
+              <Text className="text-gray-900 font-rubik-bold text-base mb-3">
+                {property?.propertyType === 'sell' ? 'Viewing Details' : 'Booking Details'}
+              </Text>
               
               <View className="flex-row items-center mb-2">
                 <Ionicons name="calendar" size={16} color="#3B82F6" />
@@ -1391,7 +1493,8 @@ const Property = () => {
                     month: 'long', 
                     day: 'numeric',
                     year: 'numeric'
-                  })} - {(() => {
+                  })}
+                  {property?.propertyType === 'rent' && ` - ${(() => {
                     const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDate!);
                     const endDate = new Date(startDate);
                     endDate.setDate(startDate.getDate() + requestedDays - 1);
@@ -1401,35 +1504,49 @@ const Property = () => {
                       day: 'numeric',
                       year: 'numeric'
                     });
-                  })()}
+                  })()}`}
                 </Text>
               </View>
               
-              <View className="flex-row items-center mb-2">
-                <Ionicons name="time" size={16} color="#3B82F6" />
-                <Text className="text-gray-600 font-rubik ml-2">
-                  {requestedDays} day{requestedDays > 1 ? 's' : ''} • Check-in: 3:00 PM • Checkout: 11:00 AM
-                </Text>
-              </View>
+              {property?.propertyType === 'sell' && selectedTimeSlot && (
+                <View className="flex-row items-center mb-2">
+                  <Ionicons name="time" size={16} color="#3B82F6" />
+                  <Text className="text-gray-600 font-rubik ml-2">
+                    Viewing Time: {selectedTimeSlot}
+                  </Text>
+                </View>
+              )}
               
-              <View className="flex-row items-center mb-2">
-                <Ionicons name="people" size={16} color="#3B82F6" />
-                <Text className="text-gray-600 font-rubik ml-2">
-                  {guests} {guests === 1 ? 'Guest' : 'Guests'}
-                </Text>
-              </View>
-              
-              <View className="flex-row items-center mb-2">
-                <Ionicons name="cash" size={16} color="#3B82F6" />
-                <Text className="text-gray-600 font-rubik ml-2">
-                  Total: ${(property?.price || 0) * requestedDays} PHP
-                </Text>
-              </View>
+              {property?.propertyType === 'rent' && (
+                <>
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="time" size={16} color="#3B82F6" />
+                    <Text className="text-gray-600 font-rubik ml-2">
+                      {requestedDays} day{requestedDays > 1 ? 's' : ''} • Check-in: 3:00 PM • Checkout: 11:00 AM
+                    </Text>
+                  </View>
+                  
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="people" size={16} color="#3B82F6" />
+                    <Text className="text-gray-600 font-rubik ml-2">
+                      {guests} {guests === 1 ? 'Guest' : 'Guests'}
+                    </Text>
+                  </View>
+                  
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="cash" size={16} color="#3B82F6" />
+                    <Text className="text-gray-600 font-rubik ml-2">
+                      Total: ₱{(property?.price || 0) * requestedDays} PHP
+                    </Text>
+                  </View>
+                </>
+              )}
             </View>
 
-            {/* Guest Count */}
-            <View className="mb-4">
-              <Text className="text-gray-900 font-rubik-bold text-base mb-2">Number of Guests</Text>
+            {/* Guest Count - Only for rental properties */}
+            {property?.propertyType === 'rent' && (
+              <View className="mb-4">
+                <Text className="text-gray-900 font-rubik-bold text-base mb-2">Number of Guests</Text>
               <View className="flex-row items-center">
                 <TouchableOpacity 
                   onPress={() => setGuests(Math.max(1, guests - 1))}
@@ -1445,11 +1562,13 @@ const Property = () => {
                   <Ionicons name="add" size={16} color="#666" />
                 </TouchableOpacity>
               </View>
-            </View>
+              </View>
+            )}
 
-            {/* Special Requests */}
-            <View className="mb-4">
-              <Text className="text-gray-900 font-rubik-bold text-base mb-2">Special Requests (Optional)</Text>
+            {/* Special Requests - Only for rental properties */}
+            {property?.propertyType === 'rent' && (
+              <View className="mb-4">
+                <Text className="text-gray-900 font-rubik-bold text-base mb-2">Special Requests (Optional)</Text>
               <TextInput
                 className="bg-gray-100 rounded-lg px-3 py-3 text-gray-900 font-rubik"
                 placeholder="Any special requirements or notes..."
@@ -1460,13 +1579,17 @@ const Property = () => {
                 numberOfLines={3}
                 textAlignVertical="top"
               />
-            </View>
+              </View>
+            )}
 
             {/* Contact Info */}
             <View className="mb-6 p-3 bg-blue-50 rounded-lg">
               <Text className="text-blue-600 font-rubik-bold text-sm mb-1">Contact Information</Text>
               <Text className="text-gray-600 font-rubik text-xs">
-                You will receive a confirmation email with property details and contact information.
+                {property?.propertyType === 'sell' 
+                  ? 'You will receive a confirmation email with viewing details and property owner contact information.'
+                  : 'You will receive a confirmation email with property details and contact information.'
+                }
               </Text>
             </View>
 
@@ -1490,13 +1613,24 @@ const Property = () => {
                     <Ionicons name="hourglass" size={16} color="white" />
                   </View>
                 ) : (
-                  <Text className="text-white font-rubik-bold text-center">Confirm Booking</Text>
+                  <Text className="text-white font-rubik-bold text-center">
+                    {property?.propertyType === 'sell' ? 'Confirm Viewing' : 'Confirm Booking'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Review Form Modal */}
+      <ReviewForm
+        visible={showReviewForm}
+        onClose={() => setShowReviewForm(false)}
+        onSubmit={handleSubmitReview}
+        loading={submittingReview}
+        propertyName={property?.name || 'Property'}
+      />
     </View>
   );
 };

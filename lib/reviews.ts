@@ -360,20 +360,27 @@ export async function deleteReview(reviewId: string) {
   }
 }
 
-// Check if user can review property (has booked it)
+// Check if user can review property
 export async function canUserReviewProperty(userId: string, propertyId: string) {
   try {
-    const bookings = await databases.listDocuments(
+    // First check if user has already reviewed this property
+    const existingReview = await databases.listDocuments(
       process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
-      "bookings",
+      "property_reviews",
       [
         Query.equal("userId", userId),
-        Query.equal("propertyId", propertyId),
-        Query.equal("status", "completed")
+        Query.equal("propertyId", propertyId)
       ]
     );
 
-    return bookings.documents.length > 0;
+    // If user has already reviewed, they can't review again
+    if (existingReview.documents.length > 0) {
+      return false;
+    }
+
+    // Allow all authenticated users to review properties
+    // This is more permissive than requiring completed bookings
+    return true;
   } catch (error: any) {
     console.error("Error checking review eligibility:", error);
     return false;

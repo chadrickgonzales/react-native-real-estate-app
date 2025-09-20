@@ -307,6 +307,7 @@ const AddPropertyBottomSheet = ({
       }
       
       // Save to database (this will also handle image uploads)
+      // Owner information will be set automatically from the current user
       const result = await createProperty(propertyData);
       
       if (result) {

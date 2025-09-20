@@ -1,21 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-  Dimensions,
-  FlatList,
-  Image,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View
+    Dimensions,
+    FlatList,
+    Image,
+    RefreshControl,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useGlobalContext } from "@/lib/global-provider";
-import { getOwnerBookings } from "@/lib/booking";
 import { getPropertiesByOwner } from "@/lib/appwrite";
+import { getOwnerBookings } from "@/lib/booking";
+import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
 
 const OwnerDashboard = () => {

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import BookingMessage from "@/components/BookingMessage";
 import images from "@/constants/images";
 import {
     createOrGetChat,
@@ -66,7 +67,8 @@ const Chat = () => {
   // Load messages when chat is ready
   const { data: chatMessages, loading: messagesLoading, refetch: refetchMessages } = useAppwrite({
     fn: (params: { chatId: string }) => getMessages(params.chatId),
-    params: { chatId: currentChatId! },
+    params: { chatId: currentChatId || "" },
+    skip: !currentChatId, // Skip if no chat ID
   });
 
   // Refresh messages when chat screen is focused
@@ -126,10 +128,17 @@ const Chat = () => {
         
         // Get property owner info
         const owner = propertyOwner || {
-          sellerId: "default_seller_id",
+          sellerId: "unknown_owner",
           sellerName: sellerName || "Property Owner",
           sellerAvatar: sellerAvatar || "",
         };
+
+        console.log("Property owner info:", {
+          propertyOwner,
+          owner,
+          sellerName,
+          sellerAvatar
+        });
 
         // Create or get chat
         const chat = await createOrGetChat({
@@ -193,6 +202,40 @@ const Chat = () => {
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.senderId === currentUser?.$id;
+    
+    // Check if this is a booking message
+    const isBookingMessage = item.text.startsWith('BOOKING_REQUEST:');
+    
+    if (isBookingMessage) {
+      try {
+        const bookingData = JSON.parse(item.text.replace('BOOKING_REQUEST:', ''));
+        const isPropertyOwner = currentUser?.$id === propertyOwner?.sellerId;
+        
+        return (
+          <View className="mb-4">
+            <BookingMessage
+              booking={{
+                ...bookingData,
+                senderId: item.senderId,
+                senderName: item.senderName
+              }}
+              currentUserId={currentUser?.$id || ''}
+              isPropertyOwner={isPropertyOwner}
+              onBookingUpdate={() => {
+                // Refresh messages when booking is updated
+                refetchMessages({ chatId: currentChatId! });
+              }}
+            />
+            <Text className="text-gray-500 font-rubik text-xs mt-1 text-center">
+              {formatTime(item.timestamp)}
+            </Text>
+          </View>
+        );
+      } catch (error) {
+        console.error('Error parsing booking message:', error);
+        // Fall back to regular message if parsing fails
+      }
+    }
     
     return (
       <View className={`flex-row mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>

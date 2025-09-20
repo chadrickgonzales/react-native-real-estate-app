@@ -1,4 +1,4 @@
-import { databases, ID, Query } from './appwrite';
+import { createOrGetChat, databases, ID, Query, sendMessage } from './appwrite';
 
 export interface Booking {
   $id: string;
@@ -94,6 +94,14 @@ export async function createBooking({
         updatedAt: new Date().toISOString(),
       }
     );
+
+    // Send booking notification to chat
+    try {
+      await sendBookingNotification(booking as Booking, "User"); // You can get the actual user name from context
+    } catch (notificationError) {
+      console.warn("Failed to send booking notification:", notificationError);
+      // Don't fail the booking creation if notification fails
+    }
 
     return { success: true, data: booking };
   } catch (error: any) {
@@ -260,6 +268,55 @@ export async function isTimeSlotAvailable(propertyId: string, date: string, time
     return existingBooking.documents.length === 0;
   } catch (error: any) {
     console.error("Error checking slot availability:", error);
+    throw error;
+  }
+}
+
+// Send booking notification to chat
+export async function sendBookingNotification(booking: Booking, buyerName: string) {
+  try {
+    // Create or get chat between buyer and property owner
+    const chat = await createOrGetChat({
+      propertyId: booking.propertyId,
+      buyerId: booking.userId,
+      sellerId: booking.ownerId,
+      propertyName: booking.propertyName,
+      sellerName: booking.ownerName,
+      sellerAvatar: "", // You can add seller avatar later
+    });
+
+    // Create booking notification message
+    const bookingNotification = {
+      $id: booking.$id,
+      propertyId: booking.propertyId,
+      propertyName: booking.propertyName,
+      propertyAddress: booking.propertyAddress,
+      propertyImage: booking.propertyImage,
+      bookingDate: booking.bookingDate,
+      bookingTime: booking.bookingTime,
+      duration: booking.duration,
+      totalAmount: booking.totalAmount,
+      currency: booking.currency,
+      guests: booking.guests,
+      specialRequests: booking.specialRequests,
+      status: booking.status,
+      bookingType: booking.totalAmount > 0 ? 'rental' : 'viewing',
+      senderId: booking.userId,
+      senderName: buyerName
+    };
+
+    // Send the booking notification as a special message
+    await sendMessage({
+      chatId: chat.$id,
+      senderId: booking.userId,
+      senderName: buyerName,
+      senderAvatar: "",
+      text: `BOOKING_REQUEST:${JSON.stringify(bookingNotification)}`
+    });
+
+    return { success: true, chatId: chat.$id };
+  } catch (error: any) {
+    console.error("Error sending booking notification:", error);
     throw error;
   }
 }

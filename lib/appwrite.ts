@@ -1,14 +1,14 @@
 import * as Linking from "expo-linking";
 import { openAuthSessionAsync } from "expo-web-browser";
 import {
-  Account,
-  Avatars,
-  Client,
-  Databases,
-  ID,
-  OAuthProvider,
-  Query,
-  Storage
+    Account,
+    Avatars,
+    Client,
+    Databases,
+    ID,
+    OAuthProvider,
+    Query,
+    Storage
 } from "react-native-appwrite";
 
 export const config = {
@@ -917,9 +917,9 @@ export async function createProperty(propertyData: any) {
   try {
     console.log("Creating property with data:", propertyData);
     
-    // Check if user is authenticated
-    const currentUser = await account.get();
-    console.log("Current authenticated user:", currentUser);
+    // Get the current user using the same method as the global context
+    const currentUser = await getCurrentUser();
+    console.log("Current user from getCurrentUser:", currentUser);
     
     if (!currentUser) {
       throw new Error("User not authenticated");
@@ -1008,7 +1008,9 @@ export async function createProperty(propertyData: any) {
         amenities: propertyData.amenities || "",
         latitude: propertyData.latitude || 0,
         longitude: propertyData.longitude || 0,
-        propertyOwnerId: currentUser.$id, // Set the current user as the property owner
+        propertyOwnerId: currentUser.$id, // Always use current user ID from users collection
+        ownerId: currentUser.$id, // Always use current user ID from users collection
+        ownerName: currentUser.userName || "Property Owner", // Always use current user name
       }
     );
 
@@ -1071,6 +1073,15 @@ export async function createOrGetChat({
   initialMessage?: string;
 }) {
   try {
+    console.log("Creating chat with parameters:", {
+      propertyId,
+      buyerId,
+      sellerId,
+      propertyName,
+      sellerName,
+      sellerAvatar,
+      initialMessage
+    });
 
     // Get property details to extract address
     let propertyAddress = "Location";
@@ -1158,6 +1169,21 @@ export async function sendMessage({
   text: string;
 }) {
   try {
+    // Validate parameters
+    if (!chatId || chatId.trim() === "") {
+      console.warn("Invalid chatId provided:", chatId);
+      return null;
+    }
+    
+    if (!senderId || senderId.trim() === "") {
+      console.warn("Invalid senderId provided:", senderId);
+      return null;
+    }
+    
+    if (!text || text.trim() === "") {
+      console.warn("Empty message text provided");
+      return null;
+    }
 
     // Check if message collection is configured
     if (!config.messagesCollectionId) {
@@ -1208,6 +1234,11 @@ export async function sendMessage({
 // Get messages for a specific chat
 export async function getMessages(chatId: string) {
   try {
+    // Validate chatId parameter
+    if (!chatId || chatId.trim() === "") {
+      console.warn("Invalid chatId provided:", chatId);
+      return [];
+    }
 
     // Check if message collection is configured
     if (!config.messagesCollectionId) {
@@ -1262,7 +1293,40 @@ export async function getUserChats(userId: string) {
       ]
     );
 
-    return chats.documents as unknown as Chat[];
+    console.log("Raw chats query result:", {
+      userId,
+      totalChats: chats.documents.length,
+      chats: chats.documents.map(chat => ({
+        id: chat.$id,
+        buyerId: chat.buyerId,
+        sellerId: chat.sellerId,
+        sellerName: chat.sellerName,
+        propertyName: chat.propertyName,
+        isBuyer: chat.buyerId === userId,
+        isSeller: chat.sellerId === userId
+      }))
+    });
+
+    // Filter out chats with only obviously invalid sellerIds
+    const validChats = chats.documents.filter(chat => 
+      chat.sellerId && 
+      chat.sellerId.trim() !== "" &&
+      chat.sellerId !== "default_seller_id"
+    );
+
+    console.log("User chats found:", {
+      userId,
+      totalChats: chats.documents.length,
+      validChats: validChats.length,
+      chats: validChats.map(chat => ({
+        id: chat.$id,
+        sellerId: chat.sellerId,
+        sellerName: chat.sellerName,
+        propertyName: chat.propertyName
+      }))
+    });
+
+    return validChats as unknown as Chat[];
   } catch (error: any) {
     console.error("Error getting user chats:", {
       message: error.message,
@@ -1276,6 +1340,16 @@ export async function getUserChats(userId: string) {
 // Mark messages as read
 export async function markMessagesAsRead(chatId: string, userId: string) {
   try {
+    // Validate parameters
+    if (!chatId || chatId.trim() === "") {
+      console.warn("Invalid chatId provided:", chatId);
+      return;
+    }
+    
+    if (!userId || userId.trim() === "") {
+      console.warn("Invalid userId provided:", userId);
+      return;
+    }
 
     // Check if message collection is configured
     if (!config.messagesCollectionId) {
@@ -1324,7 +1398,8 @@ export async function getPropertyOwner(propertyId: string) {
     );
 
     // Get the actual property owner ID from the property
-    const propertyOwnerId = property.propertyOwnerId;
+    // Use ownerId as the primary field since it's the user ID
+    const propertyOwnerId = property.ownerId || property.propertyOwnerId;
     
     if (!propertyOwnerId) {
       console.warn("Property has no owner ID:", propertyId);
@@ -1335,7 +1410,17 @@ export async function getPropertyOwner(propertyId: string) {
       };
     }
 
-    // Try to get the owner's user information
+    // Check if this is a seed data owner ID (starts with "owner_")
+    if (propertyOwnerId.startsWith("owner_")) {
+      console.log("Property has seed data owner ID, using property owner info:", propertyOwnerId);
+      return {
+        sellerId: propertyOwnerId,
+        sellerName: property.ownerName || "Property Owner",
+        sellerAvatar: property.image || "",
+      };
+    }
+
+    // Try to get the owner's user information for real user IDs
     try {
       const ownerUser = await databases.getDocument(
         config.databaseId!,
@@ -1349,10 +1434,11 @@ export async function getPropertyOwner(propertyId: string) {
         sellerAvatar: property.image || "",
       };
     } catch (error) {
-      console.warn("Could not fetch owner user info:", error);
+      console.warn("Could not fetch owner user info, using property data:", error.message);
+      // Use property's owner information as fallback
       return {
-        sellerId: propertyOwnerId,
-        sellerName: "Property Owner",
+        sellerId: propertyOwnerId, // Use the property owner ID even if user lookup failed
+        sellerName: property.ownerName || "Property Owner",
         sellerAvatar: property.image || "",
       };
     }

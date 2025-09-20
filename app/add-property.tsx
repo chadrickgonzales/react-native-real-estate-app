@@ -2,18 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
-  Image,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useGlobalContext } from "@/lib/global-provider";
 import { createProperty } from "@/lib/appwrite";
+import { useGlobalContext } from "@/lib/global-provider";
 
 const AddProperty = () => {
   const { user } = useGlobalContext();
@@ -71,8 +70,6 @@ const AddProperty = () => {
         features: formData.features.split(',').map(f => f.trim()).filter(f => f),
         contactEmail: formData.contactEmail || user.email,
         contactPhone: formData.contactPhone,
-        ownerId: user.$id,
-        ownerName: user.name,
         images: formData.images,
         status: 'active',
         createdAt: new Date().toISOString()
