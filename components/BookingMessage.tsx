@@ -1,7 +1,8 @@
-import { cancelBooking, confirmBooking } from '@/lib/booking'
+import { cancelBooking, confirmBooking, getBookingById } from '@/lib/booking'
 import { createImageSource } from '@/lib/imageUtils'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import { useEffect, useState } from 'react'
 import { Alert, Image, Text, TouchableOpacity, View } from 'react-native'
 
 interface BookingMessageProps {
@@ -34,6 +35,30 @@ export default function BookingMessage({
   isPropertyOwner, 
   onBookingUpdate 
 }: BookingMessageProps) {
+  const [latestBooking, setLatestBooking] = useState(booking)
+  const [loading, setLoading] = useState(false)
+
+  // Fetch latest booking data from database
+  const fetchLatestBooking = async () => {
+    try {
+      setLoading(true)
+      const updatedBooking = await getBookingById(booking.$id)
+      setLatestBooking(updatedBooking)
+    } catch (error) {
+      console.error('Error fetching latest booking:', error)
+      // Keep the original booking data if fetch fails
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch latest booking data when component mounts
+  useEffect(() => {
+    fetchLatestBooking()
+  }, [booking.$id])
+
+  // Use latest booking data instead of the original booking data
+  const currentBooking = latestBooking
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800'
@@ -64,8 +89,10 @@ export default function BookingMessage({
 
   const handleConfirmBooking = async () => {
     try {
-      await confirmBooking(booking.$id)
+      await confirmBooking(currentBooking.$id)
       Alert.alert('Success', 'Booking confirmed successfully!')
+      // Refresh the booking data after confirmation
+      await fetchLatestBooking()
       onBookingUpdate()
     } catch (error) {
       console.error('Error confirming booking:', error)
@@ -73,10 +100,18 @@ export default function BookingMessage({
     }
   }
 
-  const handleCancelBooking = async () => {
+  const handleCancelBooking = async (isUserCancelling: boolean = false) => {
+    const cancelMessage = isUserCancelling 
+      ? 'Are you sure you want to cancel your booking? This action cannot be undone.'
+      : 'Are you sure you want to cancel this booking?'
+    
+    const cancelReason = isUserCancelling 
+      ? 'Cancelled by user'
+      : 'Cancelled by property owner'
+
     Alert.alert(
       'Cancel Booking',
-      'Are you sure you want to cancel this booking?',
+      cancelMessage,
       [
         { text: 'Keep', style: 'cancel' },
         { 
@@ -84,8 +119,10 @@ export default function BookingMessage({
           style: 'destructive', 
           onPress: async () => {
             try {
-              await cancelBooking(booking.$id, 'Cancelled by property owner')
+              await cancelBooking(currentBooking.$id, cancelReason)
               Alert.alert('Success', 'Booking cancelled successfully!')
+              // Refresh the booking data after cancellation
+              await fetchLatestBooking()
               onBookingUpdate()
             } catch (error) {
               console.error('Error cancelling booking:', error)
@@ -98,7 +135,7 @@ export default function BookingMessage({
   }
 
   const handleViewProperty = () => {
-    router.push(`/properties/${booking.propertyId}`)
+    router.push(`/properties/${currentBooking.propertyId}`)
   }
 
   return (
@@ -108,19 +145,19 @@ export default function BookingMessage({
         <View className="flex-row items-center">
           <Ionicons name="calendar-outline" size={20} color="#3B82F6" />
           <Text className="text-lg font-rubik-bold text-black-300 ml-2">
-            {booking.bookingType === 'viewing' ? 'Viewing Request' : 'Booking Request'}
+            {currentBooking.bookingType === 'viewing' ? 'Viewing Request' : 'Booking Request'}
           </Text>
         </View>
-        <View className={`px-3 py-1 rounded-full flex-row items-center ${getStatusColor(booking.status)}`}>
-          <Ionicons name={getStatusIcon(booking.status) as any} size={12} color="currentColor" />
-          <Text className="text-xs font-rubik-bold ml-1 capitalize">{booking.status}</Text>
+        <View className={`px-3 py-1 rounded-full flex-row items-center ${getStatusColor(currentBooking.status)}`}>
+          <Ionicons name={getStatusIcon(currentBooking.status) as any} size={12} color="currentColor" />
+          <Text className="text-xs font-rubik-bold ml-1 capitalize">{currentBooking.status}</Text>
         </View>
       </View>
 
       {/* Property Image */}
       <View className="mb-4">
         <Image
-          source={createImageSource(booking.propertyImage)}
+          source={createImageSource(currentBooking.propertyImage)}
           className="w-full h-32 rounded-xl"
           resizeMode="cover"
         />
@@ -128,60 +165,60 @@ export default function BookingMessage({
 
       {/* Property Details */}
       <View className="mb-4">
-        <Text className="text-lg font-rubik-bold text-black-300 mb-2">{booking.propertyName}</Text>
+        <Text className="text-lg font-rubik-bold text-black-300 mb-2">{currentBooking.propertyName}</Text>
         <View className="flex-row items-center mb-2">
           <Ionicons name="location-outline" size={16} color="#666876" />
-          <Text className="text-sm font-rubik text-black-200 ml-2">{booking.propertyAddress}</Text>
+          <Text className="text-sm font-rubik text-black-200 ml-2">{currentBooking.propertyAddress}</Text>
         </View>
       </View>
 
       {/* Booking Details */}
       <View className="bg-accent-50 rounded-xl p-4 mb-4">
-        {booking.bookingType === 'viewing' ? (
+        {currentBooking.bookingType === 'viewing' ? (
           <>
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-sm font-rubik-medium text-black-200">Viewing Date</Text>
-              <Text className="text-sm font-rubik-bold text-black-300">{formatDate(booking.bookingDate)}</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{formatDate(currentBooking.bookingDate)}</Text>
             </View>
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-sm font-rubik-medium text-black-200">Viewing Time</Text>
-              <Text className="text-sm font-rubik-bold text-black-300">{booking.bookingTime}</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{currentBooking.bookingTime}</Text>
             </View>
             <View className="flex-row justify-between items-center">
               <Text className="text-sm font-rubik-medium text-black-200">Attendees</Text>
-              <Text className="text-sm font-rubik-bold text-black-300">{booking.guests} {booking.guests === 1 ? 'Person' : 'People'}</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{currentBooking.guests} {currentBooking.guests === 1 ? 'Person' : 'People'}</Text>
             </View>
           </>
         ) : (
           <>
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-sm font-rubik-medium text-black-200">Check-in</Text>
-              <Text className="text-sm font-rubik-bold text-black-300">{formatDate(booking.bookingDate)}</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{formatDate(currentBooking.bookingDate)}</Text>
             </View>
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-sm font-rubik-medium text-black-200">Check-out</Text>
               <Text className="text-sm font-rubik-bold text-black-300">
-                {formatDate(new Date(new Date(booking.bookingDate).getTime() + booking.duration * 60000).toISOString().split('T')[0])}
+                {formatDate(new Date(new Date(currentBooking.bookingDate).getTime() + currentBooking.duration * 60000).toISOString().split('T')[0])}
               </Text>
             </View>
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-sm font-rubik-medium text-black-200">Guests</Text>
-              <Text className="text-sm font-rubik-bold text-black-300">{booking.guests} {booking.guests === 1 ? 'Guest' : 'Guests'}</Text>
+              <Text className="text-sm font-rubik-bold text-black-300">{currentBooking.guests} {currentBooking.guests === 1 ? 'Guest' : 'Guests'}</Text>
             </View>
             <View className="flex-row justify-between items-center">
               <Text className="text-sm font-rubik-medium text-black-200">Total Amount</Text>
-              <Text className="text-lg font-rubik-bold text-primary-300">₱{booking.totalAmount.toLocaleString()}</Text>
+              <Text className="text-lg font-rubik-bold text-primary-300">₱{currentBooking.totalAmount.toLocaleString()}</Text>
             </View>
           </>
         )}
       </View>
 
       {/* Special Requests */}
-      {booking.specialRequests && (
+      {currentBooking.specialRequests && (
         <View className="mb-4">
           <Text className="text-sm font-rubik-medium text-black-200 mb-1">Special Requests:</Text>
           <Text className="text-sm font-rubik text-black-300 bg-gray-50 p-3 rounded-lg">
-            {booking.specialRequests}
+            {currentBooking.specialRequests}
           </Text>
         </View>
       )}
@@ -196,7 +233,7 @@ export default function BookingMessage({
         </TouchableOpacity>
 
         {/* Property Owner Actions */}
-        {isPropertyOwner && booking.status === 'pending' && (
+        {isPropertyOwner && currentBooking.status === 'pending' && (
           <>
             <TouchableOpacity
               className="flex-1 bg-green-100 py-3 rounded-full active:bg-green-200 shadow-md"
@@ -206,18 +243,28 @@ export default function BookingMessage({
             </TouchableOpacity>
             <TouchableOpacity
               className="flex-1 bg-red-100 py-3 rounded-full active:bg-red-200 shadow-md"
-              onPress={handleCancelBooking}
+              onPress={() => handleCancelBooking(false)}
             >
               <Text className="text-center text-red-800 font-rubik-medium">Decline</Text>
             </TouchableOpacity>
           </>
         )}
 
-        {/* Booking Status Display */}
-        {!isPropertyOwner && (
+        {/* User Actions - Allow users to cancel their own bookings */}
+        {!isPropertyOwner && currentBooking.status === 'pending' && currentBooking.senderId === currentUserId && (
+          <TouchableOpacity
+            className="flex-1 bg-red-100 py-3 rounded-full active:bg-red-200 shadow-md"
+            onPress={() => handleCancelBooking(true)}
+          >
+            <Text className="text-center text-red-800 font-rubik-medium">Cancel Booking</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Booking Status Display for non-owners or when booking is not pending */}
+        {(!isPropertyOwner && (currentBooking.status !== 'pending' || currentBooking.senderId !== currentUserId)) && (
           <View className="flex-1 items-center justify-center py-3">
             <Text className="text-sm font-rubik-medium text-gray-600">
-              Status: <Text className="font-rubik-bold capitalize">{booking.status}</Text>
+              Status: <Text className="font-rubik-bold capitalize">{currentBooking.status}</Text>
             </Text>
           </View>
         )}
