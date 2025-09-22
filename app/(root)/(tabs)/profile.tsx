@@ -11,7 +11,7 @@ import {
     View,
 } from "react-native";
 
-import { getProperties, logout } from "@/lib/appwrite";
+import { getPropertiesByOwner, logout } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
 import { useAppwrite } from "@/lib/useAppwrite";
@@ -60,19 +60,9 @@ const Profile = () => {
 
   // Fetch user's posted properties
   const { data: userProperties, loading: propertiesLoading } = useAppwrite({
-    fn: ({ filter, query, limit, propertyType }: { filter: string; query: string; limit: number; propertyType: string }) => 
-      getProperties({
-        filter,
-        query,
-        limit,
-        propertyType,
-      }),
-    params: {
-      filter: "All",
-      query: "",
-      limit: 20,
-      propertyType: "",
-    },
+    fn: ({ userId }: { userId: string }) => getPropertiesByOwner(userId),
+    params: { userId: user?.$id || "" },
+    skip: !user?.$id, // Skip if no user ID
   });
 
   const handleLogout = async () => {
@@ -246,7 +236,7 @@ const Profile = () => {
             <Text className="text-xl font-rubik-bold text-black-300">My Posts</Text>
             <TouchableOpacity 
               className="bg-primary-100 px-3 py-1 rounded-full"
-              onPress={() => router.push('/(root)/(tabs)/index')}
+              onPress={() => router.push('/owner-dashboard')}
             >
               <Text className="text-sm font-rubik-medium text-primary-300">View All</Text>
             </TouchableOpacity>
@@ -327,7 +317,7 @@ const Profile = () => {
               {userProperties.length > 3 && (
                 <TouchableOpacity 
                   className="bg-primary-50 rounded-xl p-4 items-center"
-                  onPress={() => router.push('/(root)/(tabs)/index')}
+                  onPress={() => router.push('/owner-dashboard')}
                 >
                   <Text className="text-primary-300 font-rubik-bold">
                     View {userProperties.length - 3} more posts
@@ -346,7 +336,7 @@ const Profile = () => {
               </Text>
               <TouchableOpacity 
                 className="bg-primary-300 px-6 py-3 rounded-full"
-                onPress={() => router.push('/(root)/(tabs)/index')}
+                onPress={() => router.push('/add-property')}
               >
                 <Text className="text-white font-rubik-bold">Create Post</Text>
               </TouchableOpacity>
