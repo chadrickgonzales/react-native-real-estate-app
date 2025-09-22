@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getPropertiesByOwner } from "@/lib/appwrite";
-import { getOwnerBookings } from "@/lib/booking";
+import { cancelBooking, confirmBooking, getOwnerBookings } from "@/lib/booking";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
 
@@ -59,6 +59,26 @@ const OwnerDashboard = () => {
     setRefreshing(true);
     await loadDashboardData();
     setRefreshing(false);
+  };
+
+  const handleConfirmBooking = async (bookingId: string) => {
+    try {
+      await confirmBooking(bookingId);
+      // Refresh data after confirmation
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Error confirming booking:', error);
+    }
+  };
+
+  const handleCancelBooking = async (bookingId: string) => {
+    try {
+      await cancelBooking(bookingId, 'Cancelled by property owner');
+      // Refresh data after cancellation
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -147,6 +167,28 @@ const OwnerDashboard = () => {
         </View>
       </View>
 
+      <View className="flex-row justify-between mb-6">
+        <View className="flex-1 bg-white rounded-xl p-4 mr-2 shadow-sm">
+          <View className="flex-row items-center justify-between mb-2">
+            <Ionicons name="checkmark-done-circle" size={24} color="#3B82F6" />
+            <Text className="text-2xl font-rubik-bold text-gray-900">
+              {bookings.filter(b => b.status === 'completed').length}
+            </Text>
+          </View>
+          <Text className="text-gray-600 font-rubik text-sm">Completed</Text>
+        </View>
+        
+        <View className="flex-1 bg-white rounded-xl p-4 ml-2 shadow-sm">
+          <View className="flex-row items-center justify-between mb-2">
+            <Ionicons name="close-circle" size={24} color="#EF4444" />
+            <Text className="text-2xl font-rubik-bold text-gray-900">
+              {bookings.filter(b => b.status === 'cancelled').length}
+            </Text>
+          </View>
+          <Text className="text-gray-600 font-rubik text-sm">Cancelled</Text>
+        </View>
+      </View>
+
       {/* Recent Bookings */}
       <View className="bg-white rounded-xl p-4 shadow-sm">
         <View className="flex-row items-center justify-between mb-4">
@@ -201,14 +243,14 @@ const OwnerDashboard = () => {
             onPress={() => router.push(`/(root)/properties/${item.$id}`)}
           >
             <Image
-              source={createImageSource(item.image)}
+              source={createImageSource(item.image || item.images?.[0])}
               className="w-full h-48 rounded-lg mb-3"
               resizeMode="cover"
             />
             <Text className="font-rubik-bold text-lg text-gray-900 mb-1">{item.name}</Text>
             <Text className="text-gray-600 font-rubik mb-2">{item.address}</Text>
             <View className="flex-row items-center justify-between">
-              <Text className="text-blue-500 font-rubik-bold text-lg">${item.price?.toLocaleString()}</Text>
+              <Text className="text-blue-500 font-rubik-bold text-lg">₱{item.price?.toLocaleString()}</Text>
               <View className="flex-row items-center">
                 <Ionicons name="calendar" size={16} color="#6B7280" />
                 <Text className="text-gray-600 font-rubik ml-1">
@@ -282,12 +324,23 @@ const OwnerDashboard = () => {
             )}
             
             <View className="flex-row items-center justify-between">
-              <Text className="text-blue-500 font-rubik-bold text-lg">${item.totalAmount?.toLocaleString()}</Text>
+              <Text className="text-blue-500 font-rubik-bold text-lg">₱{item.totalAmount?.toLocaleString()}</Text>
               <View className="flex-row">
                 {item.status === 'pending' && (
-                  <TouchableOpacity className="bg-green-500 px-4 py-2 rounded-lg mr-2">
-                    <Text className="text-white font-rubik-bold text-sm">Confirm</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity 
+                      className="bg-green-500 px-4 py-2 rounded-lg mr-2"
+                      onPress={() => handleConfirmBooking(item.$id)}
+                    >
+                      <Text className="text-white font-rubik-bold text-sm">Confirm</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      className="bg-red-500 px-4 py-2 rounded-lg mr-2"
+                      onPress={() => handleCancelBooking(item.$id)}
+                    >
+                      <Text className="text-white font-rubik-bold text-sm">Decline</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
                 <TouchableOpacity className="bg-gray-200 px-4 py-2 rounded-lg">
                   <Text className="text-gray-700 font-rubik-bold text-sm">View Details</Text>
