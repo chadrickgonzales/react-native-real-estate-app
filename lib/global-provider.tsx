@@ -4,8 +4,9 @@ import { StyleSheet, View } from 'react-native';
 import MapView from 'react-native-maps';
 
 import { getCurrentUser } from "./appwrite";
-import { useAppwrite } from "./useAppwrite";
+import { offlineDataProvider } from "./offline-data-provider";
 import { initializeOfflineSync } from "./offline-sync";
+import { useAppwrite } from "./useAppwrite";
 
 interface GlobalContextType {
   isLogged: boolean;
@@ -101,6 +102,21 @@ export const GlobalProvider = ({ children }: GlobalProviderProps) => {
       });
     }
   }, [user]);
+
+  // Initialize offline sample data when app starts (for offline development)
+  useEffect(() => {
+    const initializeOfflineData = async () => {
+      try {
+        // Always initialize offline data for development purposes
+        await offlineDataProvider.initializeOfflineData();
+        console.log('🌱 Offline sample data ready for development');
+      } catch (error) {
+        console.error('Failed to initialize offline sample data:', error);
+      }
+    };
+
+    initializeOfflineData();
+  }, []);
 
   // Preload map component after location is available
   useEffect(() => {
