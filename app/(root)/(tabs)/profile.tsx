@@ -1,14 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
-    Alert,
-    Image,
-    ImageSourcePropType,
-    SafeAreaView,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  ImageSourcePropType,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { getPropertiesByOwner, logout } from "@/lib/appwrite";
@@ -92,16 +92,16 @@ const Profile = () => {
   }
 
   return (
-    <SafeAreaView className="h-full bg-white">
+    <SafeAreaView className=" bg-gray-100">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerClassName="pb-32 px-7"
+        contentContainerClassName="pb-24 "
       >
-        <View className="flex flex-row items-center justify-between mt-5">
+        <View className="flex flex-row items-center justify-between pt-5">
         </View>
 
         {/* Profile Header */}
-        <View className="flex items-center mt-8 bg-gradient-to-b from-primary-50 to-white rounded-2xl p-8 mx-2">
+        <View className="flex items-center pt-8 bg-gradient-to-b from-primary-50 to-white rounded-2xl p-8 bg-white">
           <View className="relative">
             <View className="size-32 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 p-1 shadow-lg">
               <Image
@@ -132,7 +132,7 @@ const Profile = () => {
         </View>
 
         {/* User Information Section */}
-        <View className="mt-8 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <View className="mt-2 bg-white p-6 shadow-sm border border-gray-100">
           <View className="flex flex-row items-center justify-between mb-6">
             <Text className="text-xl font-rubik-bold text-black-300">Profile Information</Text>
             <TouchableOpacity 
@@ -231,7 +231,7 @@ const Profile = () => {
         </View>
 
         {/* My Posts Section */}
-        <View className="mt-8 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <View className="mt-2 bg-white  p-6 shadow-lg border border-gray-100">
           <View className="flex flex-row items-center justify-between mb-6">
             <Text className="text-xl font-rubik-bold text-black-300">My Posts</Text>
             <TouchableOpacity 
@@ -345,7 +345,7 @@ const Profile = () => {
         </View>
 
         {/* Quick Actions */}
-        <View className="mt-8 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <View className="mt-2 bg-white p-6 shadow-lg border border-gray-100">
           <Text className="text-xl font-rubik-bold text-black-300 mb-4">Quick Actions</Text>
           <View className="space-y-3">
             <SettingsItem 
@@ -367,7 +367,7 @@ const Profile = () => {
         </View>
 
         {/* Settings */}
-        <View className="mt-6 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <View className="mt-2 bg-white p-6 shadow-lg border border-gray-100">
           <Text className="text-xl font-rubik-bold text-black-300 mb-4">Settings</Text>
           <View className="space-y-3">
             <SettingsItem 
@@ -414,7 +414,7 @@ const Profile = () => {
         </View>
 
         {/* Logout */}
-        <View className="mt-6 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <View className="mt-2 bg-white p-6 shadow-lg border border-gray-100">
           <SettingsItem
             icon={icons.logout}
             title="Logout"
