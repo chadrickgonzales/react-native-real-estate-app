@@ -3,6 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
     FlatList,
+    Image,
     RefreshControl,
     Text,
     TouchableOpacity,
@@ -10,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import images from "@/constants/images";
 import { getCurrentUser, getUserChats, type Chat } from "@/lib/appwrite";
 import { useAppwrite } from "@/lib/useAppwrite";
 
@@ -78,16 +80,6 @@ const ChatList = () => {
   };
 
   const renderChatItem = ({ item }: { item: Chat }) => {
-    // Get location from property address or fallback to property name
-    const getLocation = () => {
-      if (item.propertyAddress) {
-        // Extract city/area from full address
-        const parts = item.propertyAddress.split(',');
-        return parts[parts.length - 1].trim();
-      }
-      return 'Location';
-    };
-
     const getPropertyName = () => {
       return item.propertyName || 'Property';
     };
@@ -107,9 +99,11 @@ const ChatList = () => {
         })}
       >
         <View className="mr-3">
-          <View className="w-12 h-12 rounded-full bg-blue-100 items-center justify-center">
-            <Ionicons name="home" size={24} color="#3B82F6" />
-          </View>
+          <Image
+            source={images.newYork}
+            className="w-12 h-12 rounded-lg"
+            resizeMode="cover"
+          />
         </View>
         
         <View className="flex-1">
@@ -121,10 +115,6 @@ const ChatList = () => {
               {item.lastMessageTime ? formatTime(item.lastMessageTime) : ""}
             </Text>
           </View>
-          
-          <Text className="text-gray-600 font-rubik text-sm mb-1" numberOfLines={1}>
-            📍 {getLocation()}
-          </Text>
           
           <Text className="text-gray-500 font-rubik text-sm" numberOfLines={1}>
             {item.lastMessage || "No messages yet"}
@@ -160,9 +150,11 @@ const ChatList = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {/* Header */}
-      <View className="px-4 py-3 border-b border-gray-200">
-        <Text className="text-2xl font-rubik-bold text-gray-900">Messages</Text>
+      {/* Minimal Header with Back Button */}
+      <View className="px-4 py-3 border-b border-gray-200 flex-row items-center">
+        <TouchableOpacity onPress={() => router.replace('/')} className="mr-1">
+          <Ionicons name="arrow-back" size={24} color="#374151" />
+        </TouchableOpacity>
       </View>
 
       {/* Chat List */}

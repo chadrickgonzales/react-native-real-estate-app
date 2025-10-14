@@ -106,6 +106,7 @@ const TabsLayout = () => {
         options={{
           title: "Add",
           headerShown: false,
+          tabBarStyle: { display: 'none' },
           tabBarIcon: ({ focused }) => (
             <TabIcon 
               focused={focused} 
@@ -116,9 +117,9 @@ const TabsLayout = () => {
           ),
           tabBarButton: (props) => (
             <TouchableOpacity
-              {...props}
-              onPress={() => setShowBottomSheet(true)}
-            />
+            {...props}
+            onPress={() => setShowBottomSheet(true)}
+          />
           ),
         }}
       />
