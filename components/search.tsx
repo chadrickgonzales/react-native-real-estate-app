@@ -1,6 +1,6 @@
 import icons from '@/constants/icons'
 import { router, useLocalSearchParams, usePathname } from 'expo-router'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Image, TextInput, TouchableOpacity, View } from 'react-native'
 import { useDebouncedCallback } from "use-debounce"
 import AdvancedSearch, { SearchFilters } from './AdvancedSearch'

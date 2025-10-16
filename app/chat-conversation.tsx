@@ -2,27 +2,27 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import BookingMessage from "@/components/BookingMessage";
 import images from "@/constants/images";
 import {
-    createOrGetChat,
-    getCurrentUser,
-    getMessages,
-    getPropertyOwner,
-    markMessagesAsRead,
-    sendMessage,
-    type Message as ChatMessage
+  createOrGetChat,
+  getCurrentUser,
+  getMessages,
+  getPropertyOwner,
+  markMessagesAsRead,
+  sendMessage,
+  type Message as ChatMessage
 } from "@/lib/appwrite";
 import { useAppwrite } from "@/lib/useAppwrite";
 

@@ -1,16 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, } from "react";
 import {
-    FlatList,
-    Image,
-    RefreshControl,
-    Text,
-    TouchableOpacity,
-    View
+  FlatList,
+  Image,
+  RefreshControl,
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// using the home page search bar style inline here
 import images from "@/constants/images";
 import { getCurrentUser, getUserChats, type Chat } from "@/lib/appwrite";
 import { useAppwrite } from "@/lib/useAppwrite";
@@ -18,6 +22,7 @@ import { useAppwrite } from "@/lib/useAppwrite";
 const ChatList = () => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState("");
 
   // Get current user
   const { data: currentUser } = useAppwrite({
@@ -79,6 +84,15 @@ const ChatList = () => {
     }
   };
 
+  const filteredChats = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return chats;
+    return chats.filter((c) =>
+      (c.propertyName || "").toLowerCase().includes(q) ||
+      (c.lastMessage || "").toLowerCase().includes(q)
+    );
+  }, [chats, query]);
+
   const renderChatItem = ({ item }: { item: Chat }) => {
     const getPropertyName = () => {
       return item.propertyName || 'Property';
@@ -86,7 +100,7 @@ const ChatList = () => {
 
     return (
       <TouchableOpacity
-        className="flex-row items-center p-4 border-b border-gray-100"
+        className="flex-row items-center bg-white rounded-2xl pt-2 pb-2 pl-2 pr-4 mb-3 border border-gray-100"
         onPress={() => router.push({
           pathname: '/chat-conversation',
           params: {
@@ -101,22 +115,21 @@ const ChatList = () => {
         <View className="mr-3">
           <Image
             source={images.newYork}
-            className="w-12 h-12 rounded-lg"
+            className="w-16 h-16 rounded-md"
             resizeMode="cover"
           />
         </View>
         
         <View className="flex-1">
           <View className="flex-row items-center justify-between mb-1">
-            <Text className="text-gray-900 font-rubik-bold text-base" numberOfLines={1}>
+            <Text className="text-gray-900 font-rubik-bold" numberOfLines={1}>
               {getPropertyName()}
             </Text>
-            <Text className="text-gray-500 font-rubik text-xs">
+            <Text className="text-gray-400 font-rubik text-xs">
               {item.lastMessageTime ? formatTime(item.lastMessageTime) : ""}
             </Text>
           </View>
-          
-          <Text className="text-gray-500 font-rubik text-sm" numberOfLines={1}>
+          <Text className="text-gray-600 font-rubik text-sm" numberOfLines={1}>
             {item.lastMessage || "No messages yet"}
           </Text>
         </View>
@@ -149,22 +162,47 @@ const ChatList = () => {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Minimal Header with Back Button */}
-      <View className="px-4 py-3 border-b border-gray-200 flex-row items-center">
-        <TouchableOpacity onPress={() => router.replace('/')} className="mr-1">
-          <Ionicons name="arrow-back" size={24} color="#374151" />
-        </TouchableOpacity>
+    <SafeAreaView className="flex-1" edges={['left','right','bottom']}>
+      <StatusBar hidden={true} />
+      <LinearGradient
+        colors={['#F0F9F4', '#E8F5E8', '#F0F9F4']}
+        style={{ flex: 1, paddingTop: 44}}
+      >
+      {/* Search Bar (copied style from Home) */}
+      <View className="px-4 pt-3">
+        <View className="flex-row items-center gap-2">
+          <View className="flex-1 mb-4 bg-white rounded-full shadow-md">
+            <View className="flex-row items-center">
+              <View className="flex-1 bg-white rounded-full px-3 py-3 mr-1">
+                <TextInput
+                  className="text-base font-rubik text-black-300"
+                  placeholder="Search message..."
+                  placeholderTextColor="#8c8e98"
+                  value={query}
+                  onChangeText={setQuery}
+                  onSubmitEditing={() => {}}
+                />
+              </View>
+              <TouchableOpacity 
+                className="w-16 h-16 rounded-full items-center justify-center mr-2" 
+                style={{ backgroundColor: '#14b8a6' }}
+                onPress={() => {}}
+              >
+                <Ionicons name="search" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </View>
 
       {/* Chat List */}
       <FlatList
-        data={chats}
+        data={filteredChats}
         renderItem={renderChatItem}
         keyExtractor={(item) => item.$id}
-        showsVerticalScrollIndicator={true}
-        className="flex-1"
-        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        className="flex-1 px-4"
+        contentContainerStyle={{ paddingBottom: 16, paddingTop: 0 }}
         scrollEnabled={true}
         bounces={true}
         alwaysBounceVertical={true}
@@ -177,6 +215,7 @@ const ChatList = () => {
           />
         }
       />
+      </LinearGradient>
     </SafeAreaView>
   );
 };
