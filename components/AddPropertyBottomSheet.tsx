@@ -5,16 +5,16 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import MapView, { Marker } from 'react-native-maps';
 import { createProperty } from "../lib/appwrite";
@@ -602,7 +602,7 @@ const AddPropertyBottomSheet = ({
              Property Title
            </Text>
            <TextInput
-             className={`bg-white shadow-md rounded-full px-4 py-4 border ${
+            className={`bg-white shadow-none rounded-full px-4 py-4 border ${
                errors.title ? "border-red-500" : "border-gray-200"
              }`}
              placeholder="Enter property title"
@@ -623,7 +623,7 @@ const AddPropertyBottomSheet = ({
              Address
            </Text>
            <TextInput
-             className={`bg-white shadow-md rounded-full px-4 py-4 border ${
+            className={`bg-white shadow-none rounded-full px-4 py-4 border ${
                errors.address ? "border-red-500" : "border-gray-200"
              }`}
              placeholder="Enter full address"
@@ -643,7 +643,7 @@ const AddPropertyBottomSheet = ({
            <Text className="text-base font-rubik-medium text-black mb-2">
              Property Type
            </Text>
-           <View className="bg-white px-2 py-2 rounded-full shadow-md mb-5">
+          <View className="bg-white px-2 py-2 rounded-full shadow-none mb-5">
              <PropertyTypeFilter
              selectedType={propertyData.type}
              onTypeSelect={(type) => setPropertyData({ ...propertyData, type })}
@@ -661,7 +661,7 @@ const AddPropertyBottomSheet = ({
                Bedrooms
              </Text>
              <TextInput
-               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
+              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
                  errors.bedrooms ? "border-red-500" : "border-gray-200"
                }`}
                placeholder="0"
@@ -682,7 +682,7 @@ const AddPropertyBottomSheet = ({
                Bathrooms
              </Text>
              <TextInput
-               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
+              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
                  errors.bathrooms ? "border-red-500" : "border-gray-200"
                }`}
                placeholder="0"
@@ -706,7 +706,7 @@ const AddPropertyBottomSheet = ({
                {isSelling ? 'Sale Price' : 'Monthly Rent'}
              </Text>
              <TextInput
-               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
+              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
                  errors.price ? "border-red-500" : "border-gray-200"
                }`}
                placeholder={isSelling ? "$0" : "$0/month"}
@@ -727,7 +727,7 @@ const AddPropertyBottomSheet = ({
                Area (sq ft)
              </Text>
              <TextInput
-               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
+              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
                  errors.area ? "border-red-500" : "border-gray-200"
                }`}
                placeholder="0"
@@ -750,7 +750,7 @@ const AddPropertyBottomSheet = ({
              Available Date
            </Text>
            <TextInput
-             className={`bg-white shadow-md rounded-full px-4 py-4 border ${
+            className={`bg-white shadow-none rounded-full px-4 py-4 border ${
                errors.availableDate ? "border-red-500" : "border-gray-200"
              }`}
              placeholder="MM/DD/YYYY"
@@ -773,7 +773,7 @@ const AddPropertyBottomSheet = ({
                Contact Phone
              </Text>
              <TextInput
-               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
+              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
                  errors.contactPhone ? "border-red-500" : "border-gray-200"
                }`}
                placeholder="(555) 123-4567"
@@ -817,7 +817,7 @@ const AddPropertyBottomSheet = ({
              Amenities & Features
            </Text>
            <TextInput
-             className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
+              className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
              placeholder="Pool, gym, balcony, parking, etc."
              placeholderTextColor="#8c8e98"
              value={propertyData.amenities || ""}
@@ -836,7 +836,7 @@ const AddPropertyBottomSheet = ({
                    Year Built
                  </Text>
                  <TextInput
-                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
+                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
                    placeholder="2020"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.yearBuilt || ""}
@@ -852,7 +852,7 @@ const AddPropertyBottomSheet = ({
                    Property Condition
                  </Text>
                  <TextInput
-                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
+                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
                    placeholder="New, Excellent, Good"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.propertyCondition || ""}
@@ -869,7 +869,7 @@ const AddPropertyBottomSheet = ({
                    Lot Size (sq ft)
                  </Text>
                  <TextInput
-                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
+                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
                    placeholder="5000"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.lotSize || ""}
@@ -885,7 +885,7 @@ const AddPropertyBottomSheet = ({
                    Parking Spaces
                  </Text>
                  <TextInput
-                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
+                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
                    placeholder="2"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.parkingSpaces || ""}
@@ -903,7 +903,7 @@ const AddPropertyBottomSheet = ({
                    HOA Fees (monthly)
                  </Text>
                  <TextInput
-                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
+                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
                    placeholder="$200"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.hoaFees || ""}
@@ -919,7 +919,7 @@ const AddPropertyBottomSheet = ({
                    Property Taxes (annual)
                  </Text>
                  <TextInput
-                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
+                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
                    placeholder="$5000"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.propertyTaxes || ""}
@@ -943,7 +943,7 @@ const AddPropertyBottomSheet = ({
                    Lease Duration
                  </Text>
                  <TextInput
-                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
+            className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
                    placeholder="12 months"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.leaseDuration || ""}
@@ -1137,7 +1137,7 @@ const AddPropertyBottomSheet = ({
         </View>
 
         {/* Common Features Section */}
-        <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <View className="bg-white rounded-2xl p-6 shadow-none border border-gray-100">
           <View className="flex-row items-center mb-4">
             <Ionicons name="home" size={20} color="#3B82F6" />
             <Text className="text-lg font-rubik-bold text-black ml-3">
@@ -1181,7 +1181,7 @@ const AddPropertyBottomSheet = ({
 
         {/* Selling-specific features */}
         {isSelling && (
-          <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <View className="bg-white rounded-2xl p-6 shadow-none border border-gray-100">
             <View className="flex-row items-center mb-4">
               <Ionicons name="trending-up" size={20} color="#10B981" />
               <Text className="text-lg font-rubik-bold text-black ml-3">
@@ -1242,7 +1242,7 @@ const AddPropertyBottomSheet = ({
 
         {/* Renting-specific policies */}
         {isRenting && (
-          <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <View className="bg-white rounded-2xl p-6 shadow-none border border-gray-100">
             <View className="flex-row items-center mb-4">
               <Ionicons name="document-text" size={20} color="#F59E0B" />
               <Text className="text-lg font-rubik-bold text-black ml-3">
@@ -1525,7 +1525,7 @@ const AddPropertyBottomSheet = ({
         ) : null}
 
         {/* Map Instructions Overlay */}
-        <View className="absolute top-4 left-4 right-4 bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg">
+        <View className="absolute top-4 left-4 right-4 bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-none">
           <View className="flex-row items-center">
             <Ionicons name="information-circle" size={20} color="#10B981" />
             <Text className="text-sm font-rubik text-gray-700 ml-2 flex-1">
@@ -1539,7 +1539,7 @@ const AddPropertyBottomSheet = ({
 
         {/* Location Details */}
         {propertyData.latitude && propertyData.longitude && (
-          <View className="absolute bottom-4 left-4 right-4 bg-white rounded-xl p-4 shadow-lg">
+          <View className="absolute bottom-4 left-4 right-4 bg-white rounded-xl p-4 shadow-none">
             <Text className="text-sm font-rubik-bold text-gray-800 mb-2">Property Coordinates</Text>
             <Text className="text-xs font-rubik text-gray-600">
               Latitude: {propertyData.latitude.toFixed(6)}
@@ -1573,7 +1573,16 @@ const AddPropertyBottomSheet = ({
       <View className="flex-1 bg-black/50 justify-end">
         <View
           className="bg-background-100 rounded-t-3xl"
-          style={{ height: windowHeight * 0.9 }}
+          style={{
+            height: windowHeight * 0.7,
+            marginBottom: 60,
+            // Remove any shadow/glow on the modal sheet
+            elevation: 0,
+            shadowColor: 'transparent',
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            overflow: 'hidden',
+          }}
         >
           {/* Header */}
           <View className="p-6 border-b border-gray-200">
