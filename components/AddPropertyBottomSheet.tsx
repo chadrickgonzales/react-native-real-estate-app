@@ -3,18 +3,19 @@ import images from "@/constants/images";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
+  Easing,
   Image,
-  Modal,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import MapView, { Marker } from 'react-native-maps';
 import { createProperty } from "../lib/appwrite";
@@ -39,7 +40,9 @@ const CircularCheckbox = ({ checked, onPress, label, size = 24 }: CircularCheckb
       checked ? 'border-blue-500 bg-blue-500' : 'border-gray-400 bg-white'
     }`} style={{ elevation: 0, shadowOpacity: 0 }}>
       {checked && (
-        <View className="w-3 h-3 rounded-full bg-white" />
+        <View className="w-3 h-3 rounded-full bg-white" 
+        
+        />
       )}
     </View>
     {label && <Text className="text-base font-rubik text-black">{label}</Text>}
@@ -161,6 +164,46 @@ const AddPropertyBottomSheet = ({
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
   const windowHeight = Dimensions.get("window").height;
+  const windowWidth = Dimensions.get("window").width;
+  const sheetWidth = windowWidth * 0.92;
+  const sheetHorizontalMargin = (windowWidth - sheetWidth) / 2;
+
+  // Animated height for smooth grow/shrink between steps
+  const initialSheetHeight = windowHeight * 0.35;
+  const animatedHeight = useRef(new Animated.Value(initialSheetHeight)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const target = currentStep === 1 ? windowHeight * 0.35 : windowHeight * 0.9;
+    Animated.timing(animatedHeight, {
+      toValue: target,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [currentStep, windowHeight]);
+
+  // Animate in on open: grow from bottom and fade in the backdrop
+  useEffect(() => {
+    if (visible) {
+      const target = currentStep === 1 ? windowHeight * 0.35 : windowHeight * 0.9;
+      animatedHeight.setValue(0);
+      backdropOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(animatedHeight, {
+          toValue: target,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
 
   // Filter categories to get property types (excluding "Trending" and "All")
   const propertyTypes = categories.filter(cat => 
@@ -390,6 +433,28 @@ const AddPropertyBottomSheet = ({
     }
   };
 
+  // Smoothly animate closing before dismissing
+  const handleCloseWithAnimation = () => {
+    Animated.parallel([
+      Animated.timing(animatedHeight, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      })
+    ]).start(({ finished }) => {
+      if (finished) {
+        onClose();
+      }
+    });
+  };
+
   const formatPrice = (price: string) => {
     if (!price || isNaN(Number(price))) return '$0';
     return new Intl.NumberFormat('en-US', {
@@ -492,83 +557,51 @@ const AddPropertyBottomSheet = ({
         </Text>
       </View>
 
-      <View className="space-y-4">
+      <View className="flex-row space-x-3 gap-2">
         {/* Selling Option */}
         <TouchableOpacity
-          onPress={() => setPropertyData({ ...propertyData, propertyType: 'sell' })}
-          className={`p-6 rounded-2xl border-2 ${
-            propertyData.propertyType === 'sell'
-              ? 'border-black bg-white'
-              : 'border-gray-200 bg-white'
-          }`}
+          onPress={() => {
+            setPropertyData({ ...propertyData, propertyType: 'sell' });
+            setCurrentStep(2);
+          }}
+          className="flex-1 h-16 rounded-full border bg-white border-gray-200 items-center justify-center"
           activeOpacity={1}
           style={{ backgroundColor: 'white' }}
         >
-          <View className="flex-row items-center space-x-4">
-            <View className="w-12 h-12 rounded-full items-center justify-center bg-gray-100">
+          <View className="w-full items-center justify-center">
+            <Text className="text-base font-rubik-bold text-black">Sell</Text>
+          </View>
+          <View className="absolute left-8 w-8 h-8 rounded-full items-center justify-center bg-gray-100">
               <Ionicons 
                 name="home" 
                 size={24} 
                 color="#666"
               />
             </View>
-            <View className="flex-1">
-              <Text className="text-lg font-rubik-bold text-black mb-1">
-                Sell Property
-              </Text>
-              <Text className="text-sm font-rubik text-gray-600">
-                List your property for sale to potential buyers
-              </Text>
-            </View>
-            <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-              propertyData.propertyType === 'sell' 
-                ? 'border-blue-500 bg-blue-500' 
-                : 'border-gray-400 bg-white'
-            }`} style={{ elevation: 0, shadowOpacity: 0 }}>
-              {propertyData.propertyType === 'sell' && (
-                <View className="w-3 h-3 rounded-full bg-white" />
-              )}
-            </View>
-          </View>
+          
         </TouchableOpacity>
 
         {/* Renting Option */}
         <TouchableOpacity
-          onPress={() => setPropertyData({ ...propertyData, propertyType: 'rent' })}
-          className={`p-6 rounded-2xl border-2 ${
-            propertyData.propertyType === 'rent'
-              ? 'border-black bg-white'
-              : 'border-gray-200 bg-white'
-          }`}
+          onPress={() => {
+            setPropertyData({ ...propertyData, propertyType: 'rent' });
+            setCurrentStep(2);
+          }}
+          className="flex-1 h-16 rounded-full border bg-white border-gray-200 items-center justify-center"
           activeOpacity={1}
           style={{ backgroundColor: 'white' }}
         >
-          <View className="flex-row items-center space-x-4">
-            <View className="w-12 h-12 rounded-full items-center justify-center bg-gray-100">
+          <View className="w-full items-center justify-center">
+            <Text className="text-base font-rubik-bold text-black">Rent</Text>
+          </View>
+          <View className="absolute left-8 w-8 h-8 rounded-full items-center justify-center bg-gray-100">
               <Ionicons 
                 name="key" 
                 size={24} 
                 color="#666"
               />
             </View>
-            <View className="flex-1">
-              <Text className="text-lg font-rubik-bold text-black mb-1">
-                Rent Property
-              </Text>
-              <Text className="text-sm font-rubik text-gray-600">
-                List your property for rent to potential tenants
-              </Text>
-            </View>
-            <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-              propertyData.propertyType === 'rent' 
-                ? 'border-blue-500 bg-blue-500' 
-                : 'border-gray-400 bg-white'
-            }`} style={{ elevation: 0, shadowOpacity: 0 }}>
-              {propertyData.propertyType === 'rent' && (
-                <View className="w-3 h-3 rounded-full bg-white" />
-              )}
-            </View>
-          </View>
+          
         </TouchableOpacity>
       </View>
 
@@ -602,7 +635,7 @@ const AddPropertyBottomSheet = ({
              Property Title
            </Text>
            <TextInput
-            className={`bg-white shadow-none rounded-full px-4 py-4 border ${
+             className={`bg-white shadow-md rounded-full px-4 py-4 border ${
                errors.title ? "border-red-500" : "border-gray-200"
              }`}
              placeholder="Enter property title"
@@ -623,7 +656,7 @@ const AddPropertyBottomSheet = ({
              Address
            </Text>
            <TextInput
-            className={`bg-white shadow-none rounded-full px-4 py-4 border ${
+             className={`bg-white shadow-md rounded-full px-4 py-4 border ${
                errors.address ? "border-red-500" : "border-gray-200"
              }`}
              placeholder="Enter full address"
@@ -643,7 +676,7 @@ const AddPropertyBottomSheet = ({
            <Text className="text-base font-rubik-medium text-black mb-2">
              Property Type
            </Text>
-          <View className="bg-white px-2 py-2 rounded-full shadow-none mb-5">
+           <View className="bg-white px-2 py-2 rounded-full shadow-md mb-5">
              <PropertyTypeFilter
              selectedType={propertyData.type}
              onTypeSelect={(type) => setPropertyData({ ...propertyData, type })}
@@ -661,7 +694,7 @@ const AddPropertyBottomSheet = ({
                Bedrooms
              </Text>
              <TextInput
-              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
+               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
                  errors.bedrooms ? "border-red-500" : "border-gray-200"
                }`}
                placeholder="0"
@@ -682,7 +715,7 @@ const AddPropertyBottomSheet = ({
                Bathrooms
              </Text>
              <TextInput
-              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
+               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
                  errors.bathrooms ? "border-red-500" : "border-gray-200"
                }`}
                placeholder="0"
@@ -706,7 +739,7 @@ const AddPropertyBottomSheet = ({
                {isSelling ? 'Sale Price' : 'Monthly Rent'}
              </Text>
              <TextInput
-              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
+               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
                  errors.price ? "border-red-500" : "border-gray-200"
                }`}
                placeholder={isSelling ? "$0" : "$0/month"}
@@ -727,7 +760,7 @@ const AddPropertyBottomSheet = ({
                Area (sq ft)
              </Text>
              <TextInput
-              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
+               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
                  errors.area ? "border-red-500" : "border-gray-200"
                }`}
                placeholder="0"
@@ -750,7 +783,7 @@ const AddPropertyBottomSheet = ({
              Available Date
            </Text>
            <TextInput
-            className={`bg-white shadow-none rounded-full px-4 py-4 border ${
+             className={`bg-white shadow-md rounded-full px-4 py-4 border ${
                errors.availableDate ? "border-red-500" : "border-gray-200"
              }`}
              placeholder="MM/DD/YYYY"
@@ -773,7 +806,7 @@ const AddPropertyBottomSheet = ({
                Contact Phone
              </Text>
              <TextInput
-              className={`bg-white shadow-none rounded-full px-4 py-4 border ${
+               className={`bg-white shadow-md rounded-full px-4 py-4 border ${
                  errors.contactPhone ? "border-red-500" : "border-gray-200"
                }`}
                placeholder="(555) 123-4567"
@@ -817,7 +850,7 @@ const AddPropertyBottomSheet = ({
              Amenities & Features
            </Text>
            <TextInput
-              className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
+             className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
              placeholder="Pool, gym, balcony, parking, etc."
              placeholderTextColor="#8c8e98"
              value={propertyData.amenities || ""}
@@ -836,7 +869,7 @@ const AddPropertyBottomSheet = ({
                    Year Built
                  </Text>
                  <TextInput
-                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
+                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
                    placeholder="2020"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.yearBuilt || ""}
@@ -852,7 +885,7 @@ const AddPropertyBottomSheet = ({
                    Property Condition
                  </Text>
                  <TextInput
-                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
+                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
                    placeholder="New, Excellent, Good"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.propertyCondition || ""}
@@ -869,7 +902,7 @@ const AddPropertyBottomSheet = ({
                    Lot Size (sq ft)
                  </Text>
                  <TextInput
-                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
+                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
                    placeholder="5000"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.lotSize || ""}
@@ -885,7 +918,7 @@ const AddPropertyBottomSheet = ({
                    Parking Spaces
                  </Text>
                  <TextInput
-                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
+                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
                    placeholder="2"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.parkingSpaces || ""}
@@ -903,7 +936,7 @@ const AddPropertyBottomSheet = ({
                    HOA Fees (monthly)
                  </Text>
                  <TextInput
-                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
+                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
                    placeholder="$200"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.hoaFees || ""}
@@ -919,7 +952,7 @@ const AddPropertyBottomSheet = ({
                    Property Taxes (annual)
                  </Text>
                  <TextInput
-                  className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
+                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
                    placeholder="$5000"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.propertyTaxes || ""}
@@ -943,7 +976,7 @@ const AddPropertyBottomSheet = ({
                    Lease Duration
                  </Text>
                  <TextInput
-            className="bg-white shadow-none rounded-full px-4 py-4 border border-gray-200"
+                   className="bg-white shadow-md rounded-full px-4 py-4 border border-gray-200"
                    placeholder="12 months"
                    placeholderTextColor="#8c8e98"
                    value={propertyData.leaseDuration || ""}
@@ -1137,7 +1170,7 @@ const AddPropertyBottomSheet = ({
         </View>
 
         {/* Common Features Section */}
-        <View className="bg-white rounded-2xl p-6 shadow-none border border-gray-100">
+        <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <View className="flex-row items-center mb-4">
             <Ionicons name="home" size={20} color="#3B82F6" />
             <Text className="text-lg font-rubik-bold text-black ml-3">
@@ -1181,7 +1214,7 @@ const AddPropertyBottomSheet = ({
 
         {/* Selling-specific features */}
         {isSelling && (
-          <View className="bg-white rounded-2xl p-6 shadow-none border border-gray-100">
+          <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <View className="flex-row items-center mb-4">
               <Ionicons name="trending-up" size={20} color="#10B981" />
               <Text className="text-lg font-rubik-bold text-black ml-3">
@@ -1242,7 +1275,7 @@ const AddPropertyBottomSheet = ({
 
         {/* Renting-specific policies */}
         {isRenting && (
-          <View className="bg-white rounded-2xl p-6 shadow-none border border-gray-100">
+          <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <View className="flex-row items-center mb-4">
               <Ionicons name="document-text" size={20} color="#F59E0B" />
               <Text className="text-lg font-rubik-bold text-black ml-3">
@@ -1525,7 +1558,7 @@ const AddPropertyBottomSheet = ({
         ) : null}
 
         {/* Map Instructions Overlay */}
-        <View className="absolute top-4 left-4 right-4 bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-none">
+        <View className="absolute top-4 left-4 right-4 bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg">
           <View className="flex-row items-center">
             <Ionicons name="information-circle" size={20} color="#10B981" />
             <Text className="text-sm font-rubik text-gray-700 ml-2 flex-1">
@@ -1539,7 +1572,7 @@ const AddPropertyBottomSheet = ({
 
         {/* Location Details */}
         {propertyData.latitude && propertyData.longitude && (
-          <View className="absolute bottom-4 left-4 right-4 bg-white rounded-xl p-4 shadow-none">
+          <View className="absolute bottom-4 left-4 right-4 bg-white rounded-xl p-4 shadow-lg">
             <Text className="text-sm font-rubik-bold text-gray-800 mb-2">Property Coordinates</Text>
             <Text className="text-xs font-rubik text-gray-600">
               Latitude: {propertyData.latitude.toFixed(6)}
@@ -1563,25 +1596,30 @@ const AddPropertyBottomSheet = ({
     </View>
   );
 
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
+    <View
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: -40,
+        zIndex: 500, // Below tab bar so nav remains in front
+      }}
     >
-      <View className="flex-1 bg-black/50 justify-end">
-        <View
+      <Animated.View
+        className="flex-1 justify-end"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)', opacity: backdropOpacity }}
+      >
+        <Animated.View
           className="bg-background-100 rounded-t-3xl"
           style={{
-            height: windowHeight * 0.7,
-            marginBottom: 60,
-            // Remove any shadow/glow on the modal sheet
-            elevation: 0,
-            shadowColor: 'transparent',
-            shadowOpacity: 0,
-            shadowRadius: 0,
-            overflow: 'hidden',
+            height: animatedHeight,
+            marginBottom: 90,
+            width: sheetWidth,
+            marginHorizontal: sheetHorizontalMargin,
           }}
         >
           {/* Header */}
@@ -1589,7 +1627,7 @@ const AddPropertyBottomSheet = ({
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-xl font-rubik-bold text-black">Add Property</Text>
               <TouchableOpacity
-                onPress={onClose}
+                onPress={handleCloseWithAnimation}
                 className="w-8 h-8 items-center justify-center"
               >
                 <Ionicons name="close" size={24} color="#666" />
@@ -1677,36 +1715,32 @@ const AddPropertyBottomSheet = ({
           {currentStep === 5 && renderStep5()}
 
           {/* Bottom Action Bar */}
-          {currentStep < 5 && (
-            <View className="p-6 border-t border-gray-200">
-              <View className="flex-row space-x-3">
-                {currentStep > 1 && (
-                  <TouchableOpacity
-                    className="flex-1 bg-gray-200 py-4 rounded-xl"
-                    onPress={handlePrevious}
-                  >
-                    <Text className="text-center text-gray-700 font-rubik-bold">
-                      Previous
-                    </Text>
-                  </TouchableOpacity>
-                )}
+          {currentStep > 1 && currentStep < 5 && (
+            <View className="p-6 border-t border-gray-200 pb-16">
+              <View className="flex-row space-x-3 gap-2">
                 <TouchableOpacity
-                  className={`${currentStep > 1 ? "flex-1" : "flex-1"} ${
-                    isUploading ? 'bg-blue-400' : 'bg-blue-600'
-                  } py-4 rounded-xl`}
+                  className="flex-1 bg-gray-200 py-4 rounded-full"
+                  onPress={handlePrevious}
+                >
+                  <Text className="text-center text-gray-700 font-rubik-bold">
+                    Previous
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className={`${isUploading ? 'bg-blue-400' : 'bg-blue-600'} flex-1 py-4 rounded-full`}
                   onPress={currentStep === 5 ? handleSubmit : handleNext}
                   disabled={isUploading}
                 >
                   <Text className="text-center text-white font-rubik-bold">
-                    {isUploading ? "Uploading..." : currentStep === 5 ? "Confirm & List" : "Next"}
+                    {isUploading ? "Uploading..." : "Next"}
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
-        </View>
-      </View>
-    </Modal>
+        </Animated.View>
+      </Animated.View>
+    </View>
   );
 };
 

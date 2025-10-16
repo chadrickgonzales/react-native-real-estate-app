@@ -93,7 +93,7 @@ const TabsLayout = () => {
            shadowOpacity: 0.3,
            shadowRadius: 10,
            elevation: 8,
-           zIndex: 2,
+          zIndex: 1000,
          }}
        />
        
@@ -119,7 +119,7 @@ const TabsLayout = () => {
              shadowOpacity: 0,
              shadowRadius: 0,
              elevation: 0,
-             zIndex: 2,
+            zIndex: 1000,
            },
          }}
        >
