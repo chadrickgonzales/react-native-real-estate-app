@@ -110,6 +110,27 @@ export async function createBooking({
   }
 }
 
+// Get bookings for a specific property
+export async function getPropertyBookings(propertyId: string, limit: number = 100) {
+  try {
+    const bookings = await databases.listDocuments(
+      process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+      "bookings",
+      [
+        Query.equal("propertyId", propertyId),
+        Query.equal("status", ["confirmed", "pending"]), // Only confirmed and pending bookings
+        Query.orderDesc("$createdAt"),
+        Query.limit(limit)
+      ]
+    );
+
+    return bookings.documents as Booking[];
+  } catch (error: any) {
+    console.error("Error fetching property bookings:", error);
+    return [];
+  }
+}
+
 // Get user's bookings
 export async function getUserBookings(userId: string, limit: number = 50) {
   try {

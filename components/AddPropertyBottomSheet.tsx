@@ -1,5 +1,4 @@
 import { categories } from "@/constants/data";
-import images from "@/constants/images";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -289,9 +288,24 @@ const AddPropertyBottomSheet = ({
       if (!propertyData.availableDate?.trim()) newErrors.availableDate = "Available date is required";
       if (!propertyData.contactPhone?.trim()) newErrors.contactPhone = "Contact phone is required";
       if (!propertyData.contactEmail?.trim()) newErrors.contactEmail = "Contact email is required";
-    } else if (step === 5) {
+    } else if (step === 4) {
       if (!propertyData.latitude || !propertyData.longitude) {
         newErrors.latitude = "Please pin your property location on the map" as any;
+      }
+    } else if (step === 5) {
+      // Validate availability data based on property type
+      if (propertyData.propertyType === 'sell') {
+        if (!propertyData.viewingStartDate?.trim()) newErrors.viewingStartDate = "Please select viewing start date" as any;
+        if (!propertyData.viewingEndDate?.trim()) newErrors.viewingEndDate = "Please select viewing end date" as any;
+        if (!propertyData.viewingTimeSlots || propertyData.viewingTimeSlots.length === 0) {
+          newErrors.viewingTimeSlots = "Please select at least one viewing time slot" as any;
+        }
+      } else if (propertyData.propertyType === 'rent') {
+        if (!propertyData.rentalStartDate?.trim()) newErrors.rentalStartDate = "Please select rental start date" as any;
+        if (!propertyData.rentalEndDate?.trim()) newErrors.rentalEndDate = "Please select rental end date" as any;
+        if (!propertyData.checkInTime?.trim()) newErrors.checkInTime = "Please set check-in time" as any;
+        if (!propertyData.checkoutTime?.trim()) newErrors.checkoutTime = "Please set checkout time" as any;
+        if (!propertyData.rentalPeriod?.trim()) newErrors.rentalPeriod = "Please select rental period" as any;
       }
     }
 
@@ -301,7 +315,7 @@ const AddPropertyBottomSheet = ({
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      if (currentStep < 6) {
+      if (currentStep < 5) {
         setCurrentStep(currentStep + 1);
       } else {
         handleSubmit();
@@ -324,9 +338,9 @@ const AddPropertyBottomSheet = ({
     }
   }, [user, visible]);
 
-  // Get user location when step 5 is reached
+  // Get user location when step 4 is reached
   useEffect(() => {
-    if (currentStep === 5 && !userLocation && !locationError) {
+    if (currentStep === 4 && !userLocation && !locationError) {
       getCurrentLocation();
     }
   }, [currentStep, userLocation, locationError]);
@@ -1377,123 +1391,6 @@ const AddPropertyBottomSheet = ({
   };
 
 
-  const renderStep4 = () => (
-    <View className="flex-1 bg-black">
-      {/* Hero Image Section */}
-      <View className="relative" style={{ height: windowHeight * 0.4 }}>
-        <Image
-          source={propertyData.images.length > 0 ? { uri: propertyData.images[0] } : images.newYork}
-          className="w-full h-full"
-          resizeMode="cover"
-        />
-        
-        {/* Navigation Overlay */}
-        <View className="absolute top-10 left-0 right-0 z-10 px-5" style={{ paddingTop: 50 }}>
-          <View className="flex-row items-center justify-between">
-            <TouchableOpacity
-              onPress={handlePrevious}
-              className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full items-center justify-center"
-            >
-              <Ionicons name="arrow-back" size={20} color="white" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full items-center justify-center">
-              <Ionicons name="heart-outline" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Image Counter */}
-        <View className="absolute bottom-10 right-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
-          <Text className="text-white text-sm font-rubik-medium">
-            {propertyData.images.length > 0 ? `1/${propertyData.images.length}` : "1/1"}
-          </Text>
-        </View>
-      </View>
-
-      {/* Bottom Sheet */}
-      <View className="bg-background-100 rounded-t-3xl" style={{ height: windowHeight * 0.6, marginTop: -24 }}>
-        <View className="flex-1">
-          <ScrollView 
-            showsVerticalScrollIndicator={false}
-            contentContainerClassName="pb-6 mt-5"
-            className="flex-1"
-          >
-            <View className="px-6 pt-1">
-              {/* Property Address */}
-              <Text className="text-2xl font-rubik-bold text-black mb-2">
-                {propertyData.address || "Enter property address"}
-              </Text>
-              
-              <Text className="text-black font-rubik mb-1">
-                {propertyData.type ? `${propertyData.type} in ` : ""}{propertyData.address?.split(',')[1]?.trim() || "location"}
-              </Text>
-              
-              {/* Property Details */}
-              <View className="flex-row items-center justify-between mb-6">
-                <View className="flex-row items-center">
-                  <Ionicons name="bed" size={20} color="#666" />
-                  <Text className="text-gray-600 font-rubik ml-2">{propertyData.bedrooms || "0"} beds</Text>
-                </View>
-                <View className="flex-row items-center">
-                  <Ionicons name="water" size={20} color="#666" />
-                  <Text className="text-gray-600 font-rubik ml-2">{propertyData.bathrooms || "0"} baths</Text>
-                </View>
-                <View className="flex-row items-center">
-                  <Ionicons name="resize" size={20} color="#666" />
-                  <Text className="text-gray-600 font-rubik ml-2">{propertyData.area || "0"} sq ft</Text>
-                </View>
-              </View>
-
-              {/* Price */}
-              <View className="mb-6">
-                <Text className="text-3xl font-rubik-bold text-black">
-                  {formatPrice(propertyData.price)}
-                </Text>
-                <Text className="text-gray-600 font-rubik">
-                  {propertyData.propertyType === 'rent' ? 'per month' : 'total price'}
-                </Text>
-              </View>
-
-              {/* Description */}
-              <View className="mb-6">
-                <Text className="text-lg font-rubik-bold text-black mb-3">Description</Text>
-                <Text className="text-gray-700 font-rubik leading-6">
-                  {propertyData.description || "No description provided."}
-                </Text>
-              </View>
-
-              {/* Amenities */}
-              <View className="mb-6">
-                <Text className="text-lg font-rubik-bold text-black mb-3">Amenities</Text>
-                <View className="flex-row flex-wrap">
-                  {propertyData.amenities ? propertyData.amenities.split(',').map((amenity, index) => (
-                    <View key={index} className="bg-gray-100 px-3 py-2 rounded-full mr-2 mb-2">
-                      <Text className="text-gray-700 font-rubik text-sm">{amenity.trim()}</Text>
-                    </View>
-                  )) : (
-                    <Text className="text-gray-500 font-rubik">No amenities listed</Text>
-                  )}
-                </View>
-              </View>
-            </View>
-          </ScrollView>
-
-          {/* Previous Button for Step 4 */}
-          <View className="p-6 bg-background-100 border-t border-gray-200">
-            <TouchableOpacity
-              className="bg-gray-200 py-4 rounded-xl"
-              onPress={handlePrevious}
-            >
-              <Text className="text-center text-gray-700 font-rubik-bold">
-                Previous
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
 
   const renderStep5 = () => (
     <View className="flex-1">
@@ -2113,8 +2010,8 @@ const AddPropertyBottomSheet = ({
               </TouchableOpacity>
             </View>
             
-            {/* Submit Button - Only show on Step 6 */}
-            {currentStep === 6 && (
+            {/* Submit Button - Only show on Step 5 */}
+            {currentStep === 5 && (
               <View className="mb-4">
                 <TouchableOpacity
                   className={`w-full py-3 rounded-xl ${
@@ -2132,7 +2029,7 @@ const AddPropertyBottomSheet = ({
             
             {/* Progress Steps */}
             <View className="flex-row items-center justify-center">
-              {[1, 2, 3, 4, 5, 6].map((step) => (
+              {[1, 2, 3, 4, 5].map((step) => (
                 <View key={step} className="flex-row items-center">
                   <View
                     className={`w-8 h-8 rounded-full items-center justify-center ${
@@ -2189,14 +2086,12 @@ const AddPropertyBottomSheet = ({
             </ScrollView>
           )}
 
-          {currentStep === 4 && renderStep4()}
+          {currentStep === 4 && renderStep5()}
 
-          {currentStep === 5 && renderStep5()}
-
-          {currentStep === 6 && renderStep6()}
+          {currentStep === 5 && renderStep6()}
 
           {/* Bottom Action Bar */}
-          {currentStep > 1 && currentStep < 6 && (
+          {currentStep > 1 && currentStep < 5 && (
             <View className="p-6 border-t border-gray-200 pb-16">
               <View className="flex-row space-x-3 gap-2">
                 <TouchableOpacity
@@ -2209,11 +2104,11 @@ const AddPropertyBottomSheet = ({
                 </TouchableOpacity>
                 <TouchableOpacity
                   className={`${isUploading ? 'bg-blue-400' : 'bg-blue-600'} flex-1 py-4 rounded-full`}
-                  onPress={currentStep === 6 ? handleSubmit : handleNext}
+                  onPress={currentStep === 5 ? handleSubmit : handleNext}
                   disabled={isUploading}
                 >
                   <Text className="text-center text-white font-rubik-bold">
-                    {isUploading ? "Uploading..." : currentStep === 6 ? "Submit Property" : "Next"}
+                    {isUploading ? "Uploading..." : currentStep === 5 ? "Submit Property" : "Next"}
                   </Text>
                 </TouchableOpacity>
               </View>

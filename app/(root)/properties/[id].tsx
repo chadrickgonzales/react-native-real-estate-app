@@ -2,15 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
-    Dimensions,
-    FlatList,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -18,7 +18,7 @@ import images from "@/constants/images";
 
 import ReviewForm from "@/components/ReviewForm";
 import { getPropertyById } from "@/lib/appwrite";
-import { createBooking } from "@/lib/booking";
+import { Booking, createBooking, getPropertyBookings } from "@/lib/booking";
 import { useGlobalContext } from "@/lib/global-provider";
 import { createImageSource } from "@/lib/imageUtils";
 import { createPropertyReview, getPropertyReviewStats } from "@/lib/reviews";
@@ -47,6 +47,8 @@ const Property = () => {
   const [reviewStats, setReviewStats] = useState<any>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [propertyBookings, setPropertyBookings] = useState<Booking[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
 
   const windowHeight = Dimensions.get("window").height;
 
@@ -102,6 +104,9 @@ const Property = () => {
         if (date < startDate || date > endDate) {
           return false;
         }
+      } else {
+        // If no availability dates are set, show warning
+        return false; // Don't show as available if no dates are set
       }
       
       // For rental period restrictions
@@ -111,16 +116,8 @@ const Property = () => {
         return dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
       }
       
-      // Simulate realistic booking patterns for other rental types
-      const dayOfWeek = date.getDay();
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
-      const random = (date.getTime() + day) % 10;
-      
-      if (isWeekend) {
-        return random >= 3; // 70% chance available on weekends
-      } else {
-        return random >= 1; // 90% chance available on weekdays
-      }
+      // If we reach here, the date is within the availability period
+      return true;
     }
     
     // For sale properties, check against viewing availability period
@@ -136,59 +133,49 @@ const Property = () => {
         if (date < startDate || date > endDate) {
           return false;
         }
-      }
-      
-      // Simulate viewing availability
-      const dayOfWeek = date.getDay();
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
-      const random = (date.getTime() + day) % 10;
-      
-      if (isWeekend) {
-        return random >= 1; // 90% chance has available viewing slots on weekends
       } else {
-        return random >= 2; // 80% chance has available viewing slots on weekdays
+        // If no availability dates are set, show warning
+        return false; // Don't show as available if no dates are set
       }
+      
+      // If we reach here, the date is within the availability period
+      return true;
     }
     
-    return true;
+    return false; // Default to not available
   };
 
   const isDateBooked = (day: number, month: Date) => {
     if (!day) return false;
     
     const date = new Date(month.getFullYear(), month.getMonth(), day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const dateString = date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
     
-    // For staycation properties, simulate realistic booking patterns
-    if (property?.propertyType === 'rent' && (property.type === 'Villa' || property.type === 'Townhomes')) {
-      const dayOfWeek = date.getDay();
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0; // Fri, Sat, Sun
-      
-      const random = (date.getTime() + day) % 10;
-      if (isWeekend) {
-        return random < 3; // 30% chance booked on weekends
+    // Check if this date has any confirmed or pending bookings
+    return propertyBookings.some(booking => {
+      // For rental properties, check if the date falls within the booking period
+      if (property?.propertyType === 'rent') {
+        // Parse booking date string directly to avoid timezone issues
+        const [bookingYear, bookingMonth, bookingDay] = booking.bookingDate.split('-').map(Number);
+        const bookingStartDate = new Date(bookingYear, bookingMonth - 1, bookingDay); // Month is 0-indexed
+        
+        const durationInDays = Math.floor(booking.duration / (24 * 60));
+        const bookingEndDate = new Date(bookingStartDate);
+        bookingEndDate.setDate(bookingStartDate.getDate() + durationInDays);
+        
+        // Compare dates without time components
+        const checkDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const startDate = new Date(bookingStartDate.getFullYear(), bookingStartDate.getMonth(), bookingStartDate.getDate());
+        const endDate = new Date(bookingEndDate.getFullYear(), bookingEndDate.getMonth(), bookingEndDate.getDate());
+        
+        // Check if the date falls within the booking period (inclusive of both check-in and checkout days)
+        return checkDate >= startDate && checkDate <= endDate;
       } else {
-        return random < 1; // 10% chance booked on weekdays
+        // For sale properties, check exact booking date
+        const bookingDateString = booking.bookingDate;
+        return bookingDateString === dateString;
       }
-    }
-    
-    // For sale properties, simulate viewing appointments
-    if (property?.propertyType === 'sell') {
-      const dayOfWeek = date.getDay();
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0; // Fri, Sat, Sun
-      
-      // Only mark as "booked" if the day is completely unavailable (rare)
-      // Most days will have some viewing slots available
-      const random = (date.getTime() + day) % 10;
-      if (isWeekend) {
-        return random < 1; // 10% chance completely booked on weekends
-      } else {
-        return random < 2; // 20% chance completely booked on weekdays
-      }
-    }
-    
-    return false;
+    });
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -201,40 +188,7 @@ const Property = () => {
     setCurrentMonth(newMonth);
   };
 
-  const generateTimeSlots = (day: number) => {
-    const timeSlots = [];
-    
-    // If property has specific viewing time slots set, use those
-    if (property?.viewingTimeSlots && property.viewingTimeSlots.length > 0) {
-      property.viewingTimeSlots.forEach((time, index) => {
-        timeSlots.push({
-          time: time,
-          available: Math.random() > 0.2, // 80% chance available
-          id: `${day}-${index}`
-        });
-      });
-    } else {
-      // Default time slots if no specific ones are set
-      const startHour = 9; // 9 AM
-      const endHour = 17; // 5 PM
-      
-      for (let hour = startHour; hour < endHour; hour++) {
-        // Generate 2 slots per hour (30 minutes each)
-        timeSlots.push({
-          time: `${hour.toString().padStart(2, '0')}:00`,
-          available: Math.random() > 0.3, // 70% chance available
-          id: `${day}-${hour}-00`
-        });
-        timeSlots.push({
-          time: `${hour.toString().padStart(2, '0')}:30`,
-          available: Math.random() > 0.3, // 70% chance available
-          id: `${day}-${hour}-30`
-        });
-      }
-    }
-    
-    return timeSlots;
-  };
+ 
 
   // Calculate maximum consecutive days available from a given date
   const calculateMaxConsecutiveDays = (startDay: number, month: Date): number => {
@@ -396,6 +350,9 @@ const Property = () => {
         setMaxConsecutiveDays(0);
         setGuests(1);
         setSpecialRequests("");
+        
+        // Refresh bookings to show the new booking on calendar
+        await loadPropertyBookings();
       }
     } catch (error) {
       console.error('Error creating booking:', error);
@@ -441,10 +398,28 @@ const Property = () => {
     }
   };
 
-  // Load review stats when property is available
+  // Load bookings for this property
+  const loadPropertyBookings = async () => {
+    if (!id) return;
+    
+    try {
+      setLoadingBookings(true);
+      const bookings = await getPropertyBookings(id);
+      setPropertyBookings(bookings);
+      console.log(`Loaded ${bookings.length} bookings for property ${id}`);
+    } catch (error) {
+      console.error('Error loading property bookings:', error);
+      setPropertyBookings([]);
+    } finally {
+      setLoadingBookings(false);
+    }
+  };
+
+  // Load review stats and bookings when property is available
   React.useEffect(() => {
     if (property) {
       loadReviewStats();
+      loadPropertyBookings();
     }
   }, [property]);
 
@@ -760,7 +735,15 @@ const Property = () => {
           {property.propertyType === 'rent' && (
             <View className="bg-white mb-1 shadow-lg p-6">
               <View className="mb-4">
-                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability for Booking</Text>
+                <View className="flex-row items-center justify-between mb-4">
+                  <Text className="text-lg font-rubik-bold text-gray-900">Availability for Booking</Text>
+                  {loadingBookings && (
+                    <View className="flex-row items-center">
+                      <Ionicons name="refresh" size={16} color="#6B7280" />
+                      <Text className="text-gray-500 font-rubik text-xs ml-1">Loading bookings...</Text>
+                    </View>
+                  )}
+                </View>
                 
                 
                 {/* Calendar Header */}
@@ -804,20 +787,22 @@ const Property = () => {
                       const isInRange = selectedDate && day && day > selectedDate && day < selectedDate + requestedDays;
                       
                       return (
-                        <View key={index} className="w-[14.28%] aspect-square items-center justify-center">
+                        <View key={index} className="w-[12.28%] aspect-square items-center justify-center">
                           {day ? (
                             <TouchableOpacity 
                               onPress={() => handleDateClick(day)}
-                              className={`w-8 h-8 rounded-full items-center justify-center ${
+                              className={`w-10 h-10 rounded-full items-center justify-center ${
                                 isDateBooked(day, currentMonth) 
                                   ? 'bg-red-100' 
                                   : isSelected
                                   ? 'bg-blue-500'
                                   : isInRange
                                   ? 'bg-blue-200'
-                                  : 'bg-green-100'
+                                  : isDateAvailable(day, currentMonth)
+                                  ? 'bg-green-100'
+                                  : 'bg-gray-200'
                               }`}
-                              disabled={isDateBooked(day, currentMonth)}
+                              disabled={isDateBooked(day, currentMonth) || !isDateAvailable(day, currentMonth)}
                             >
                               <Text className={`font-rubik text-sm ${
                                 isDateBooked(day, currentMonth) 
@@ -826,7 +811,9 @@ const Property = () => {
                                   ? 'text-white'
                                   : isInRange
                                   ? 'text-blue-800'
-                                  : 'text-green-600'
+                                  : isDateAvailable(day, currentMonth)
+                                  ? 'text-green-600'
+                                  : 'text-gray-400'
                               }`}>
                                 {day}
                               </Text>
@@ -841,49 +828,22 @@ const Property = () => {
                 </View>
 
                 {/* Legend */}
-                <View className="flex-row justify-center mt-4 space-x-4">
+                <View className="flex-row justify-center mt-4 gap-4">
                   <View className="flex-row items-center">
                     <View className="w-3 h-3 bg-green-100 rounded-full mr-2" />
                     <Text className="text-gray-600 font-rubik text-xs">Available</Text>
                   </View>
                   <View className="flex-row items-center">
+                    <View className="w-3 h-3 bg-gray-200 rounded-full mr-2" />
+                    <Text className="text-gray-600 font-rubik text-xs">Not Available</Text>
+                  </View>
+                  <View className="flex-row items-center">
                     <View className="w-3 h-3 bg-red-100 rounded-full mr-2" />
                     <Text className="text-gray-600 font-rubik text-xs">Booked</Text>
                   </View>
-                  <View className="flex-row items-center">
-                    <View className="w-3 h-3 bg-blue-500 rounded-full mr-2" />
-                    <Text className="text-gray-600 font-rubik text-xs">Check-in</Text>
-                  </View>
-                  <View className="flex-row items-center">
-                    <View className="w-3 h-3 bg-blue-200 rounded-full mr-2" />
-                    <Text className="text-gray-600 font-rubik text-xs">Stay Period</Text>
-                  </View>
+                 
                 </View>
-
-                {/* Rental Info */}
-                <View className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <View className="flex-row items-center mb-2">
-                    <Ionicons name="home" size={16} color="#3B82F6" />
-                    <Text className="text-blue-600 font-rubik-medium ml-2 text-sm">Rental Property</Text>
-                  </View>
-                  <Text className="text-gray-600 font-rubik text-sm mb-2">
-                    {property.type} - Available for rental booking
-                  </Text>
-                  <View className="flex-row items-center">
-                    <Ionicons name="calendar" size={14} color="#3B82F6" />
-                    <Text className="text-gray-600 font-rubik text-xs ml-2">
-                      Select your preferred dates for booking
-                    </Text>
-                  </View>
-                  {property.furnishedStatus && (
-                    <View className="flex-row items-center mt-2">
-                      <Ionicons name="checkmark-circle" size={14} color="#3B82F6" />
-                      <Text className="text-gray-600 font-rubik text-xs ml-2">
-                        Fully furnished • Ready for immediate stay
-                      </Text>
-                    </View>
-                  )}
-                </View>
+               
               </View>
             </View>
           )}
@@ -892,7 +852,15 @@ const Property = () => {
           {property.propertyType === 'sell' && (
             <View className="bg-white mb-1 shadow-lg p-6">
               <View className="mb-4">
-                <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability for Viewing</Text>
+                <View className="flex-row items-center justify-between mb-4">
+                  <Text className="text-lg font-rubik-bold text-gray-900">Availability for Viewing</Text>
+                  {loadingBookings && (
+                    <View className="flex-row items-center">
+                      <Ionicons name="refresh" size={16} color="#6B7280" />
+                      <Text className="text-gray-500 font-rubik text-xs ml-1">Loading bookings...</Text>
+                    </View>
+                  )}
+                </View>
                 
                 {/* Calendar Header */}
                 <View className="flex-row items-center justify-between mb-4">
@@ -936,14 +904,18 @@ const Property = () => {
                             className={`w-8 h-8 rounded-full items-center justify-center ${
                               isDateBooked(day, currentMonth) 
                                 ? 'bg-red-100' 
-                                : 'bg-green-100'
+                                : isDateAvailable(day, currentMonth)
+                                ? 'bg-green-100'
+                                : 'bg-gray-200'
                             }`}
-                            disabled={isDateBooked(day, currentMonth)}
+                            disabled={isDateBooked(day, currentMonth) || !isDateAvailable(day, currentMonth)}
                           >
                             <Text className={`font-rubik text-sm ${
                               isDateBooked(day, currentMonth) 
                                 ? 'text-red-600' 
-                                : 'text-green-600'
+                                : isDateAvailable(day, currentMonth)
+                                ? 'text-green-600'
+                                : 'text-gray-400'
                             }`}>
                               {day}
                             </Text>
@@ -963,6 +935,10 @@ const Property = () => {
                     <Text className="text-gray-600 font-rubik text-xs">Available for Viewing</Text>
                   </View>
                   <View className="flex-row items-center">
+                    <View className="w-3 h-3 bg-gray-200 rounded-full mr-2" />
+                    <Text className="text-gray-600 font-rubik text-xs">Not Available</Text>
+                  </View>
+                  <View className="flex-row items-center">
                     <View className="w-3 h-3 bg-red-100 rounded-full mr-2" />
                     <Text className="text-gray-600 font-rubik text-xs">Viewing Booked</Text>
                   </View>
@@ -977,6 +953,24 @@ const Property = () => {
                   <Text className="text-gray-600 font-rubik text-sm mb-2">
                     Schedule a viewing appointment to see this {property.type} in person
                   </Text>
+                  
+                  {/* Availability Status */}
+                  {property.viewingStartDate && property.viewingEndDate ? (
+                    <View className="flex-row items-center mb-1">
+                      <Ionicons name="calendar" size={14} color="#3B82F6" />
+                      <Text className="text-gray-600 font-rubik text-xs ml-2">
+                        Viewing available: {new Date(property.viewingStartDate).toLocaleDateString()} - {new Date(property.viewingEndDate).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View className="flex-row items-center mb-1">
+                      <Ionicons name="warning" size={14} color="#F59E0B" />
+                      <Text className="text-orange-600 font-rubik text-xs ml-2">
+                        Viewing dates not set by owner
+                      </Text>
+                    </View>
+                  )}
+                  
                   <View className="flex-row items-center mb-1">
                     <Ionicons name="time" size={14} color="#3B82F6" />
                     <Text className="text-gray-600 font-rubik text-xs ml-2">
@@ -1147,17 +1141,9 @@ const Property = () => {
                     <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Pet Deposit</Text>
                     <Text className="text-gray-900 font-rubik-bold">{property.petDeposit ? `${property.petDeposit}` : 'N/A'}</Text>
                   </View>
-                  <View className="w-1/2 mb-3">
-                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Available Date</Text>
-                    <Text className="text-gray-900 font-rubik-bold">{property.availableDate || 'N/A'}</Text>
-                  </View>
                   <View className="w-full mb-3">
                     <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Utilities</Text>
                     <Text className="text-gray-900 font-rubik-bold">{property.utilities || 'N/A'}</Text>
-                  </View>
-                  <View className="w-full mb-3">
-                    <Text className="text-xs text-gray-500 font-rubik-medium mb-1">Move-in Requirements</Text>
-                    <Text className="text-gray-900 font-rubik-bold">{property.moveInRequirements || 'N/A'}</Text>
                   </View>
                 </View>
               </View>
