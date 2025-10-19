@@ -86,15 +86,36 @@ const Property = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // For staycation properties (Villa/Townhomes), check availability
-    if (property?.propertyType === 'rent' && (property.type === 'Villa' || property.type === 'Townhomes')) {
-      // More realistic booking pattern for staycation properties
-      // Weekends (Fri-Sun) are more likely to be booked
-      const dayOfWeek = date.getDay();
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0; // Fri, Sat, Sun
+    // Check if date is in the future
+    if (date < today) return false;
+    
+    // For rental properties, check against rental availability period
+    if (property?.propertyType === 'rent') {
+      // Check if property has rental availability settings
+      if (property.rentalStartDate && property.rentalEndDate) {
+        const startDate = new Date(property.rentalStartDate);
+        const endDate = new Date(property.rentalEndDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        // Date must be within the rental availability period
+        if (date < startDate || date > endDate) {
+          return false;
+        }
+      }
       
-      // Simulate higher booking rates on weekends
+      // For rental period restrictions
+      if (property.rentalPeriod === 'weekend') {
+        const dayOfWeek = date.getDay();
+        // Only allow Friday (5), Saturday (6), Sunday (0)
+        return dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
+      }
+      
+      // Simulate realistic booking patterns for other rental types
+      const dayOfWeek = date.getDay();
+      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
       const random = (date.getTime() + day) % 10;
+      
       if (isWeekend) {
         return random >= 3; // 70% chance available on weekends
       } else {
@@ -102,14 +123,26 @@ const Property = () => {
       }
     }
     
-    // For sale properties, check viewing availability
+    // For sale properties, check against viewing availability period
     if (property?.propertyType === 'sell') {
-      const dayOfWeek = date.getDay();
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0; // Fri, Sat, Sun
+      // Check if property has viewing availability settings
+      if (property.viewingStartDate && property.viewingEndDate) {
+        const startDate = new Date(property.viewingStartDate);
+        const endDate = new Date(property.viewingEndDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        // Date must be within the viewing availability period
+        if (date < startDate || date > endDate) {
+          return false;
+        }
+      }
       
-      // For viewing appointments, most days have multiple slots available
-      // Only mark as unavailable if the day is completely booked or blocked
+      // Simulate viewing availability
+      const dayOfWeek = date.getDay();
+      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
       const random = (date.getTime() + day) % 10;
+      
       if (isWeekend) {
         return random >= 1; // 90% chance has available viewing slots on weekends
       } else {
@@ -117,7 +150,7 @@ const Property = () => {
       }
     }
     
-    return date >= today;
+    return true;
   };
 
   const isDateBooked = (day: number, month: Date) => {
@@ -170,21 +203,34 @@ const Property = () => {
 
   const generateTimeSlots = (day: number) => {
     const timeSlots = [];
-    const startHour = 9; // 9 AM
-    const endHour = 17; // 5 PM
     
-    for (let hour = startHour; hour < endHour; hour++) {
-      // Generate 2 slots per hour (30 minutes each)
-      timeSlots.push({
-        time: `${hour.toString().padStart(2, '0')}:00`,
-        available: Math.random() > 0.3, // 70% chance available
-        id: `${day}-${hour}-00`
+    // If property has specific viewing time slots set, use those
+    if (property?.viewingTimeSlots && property.viewingTimeSlots.length > 0) {
+      property.viewingTimeSlots.forEach((time, index) => {
+        timeSlots.push({
+          time: time,
+          available: Math.random() > 0.2, // 80% chance available
+          id: `${day}-${index}`
+        });
       });
-      timeSlots.push({
-        time: `${hour.toString().padStart(2, '0')}:30`,
-        available: Math.random() > 0.3, // 70% chance available
-        id: `${day}-${hour}-30`
-      });
+    } else {
+      // Default time slots if no specific ones are set
+      const startHour = 9; // 9 AM
+      const endHour = 17; // 5 PM
+      
+      for (let hour = startHour; hour < endHour; hour++) {
+        // Generate 2 slots per hour (30 minutes each)
+        timeSlots.push({
+          time: `${hour.toString().padStart(2, '0')}:00`,
+          available: Math.random() > 0.3, // 70% chance available
+          id: `${day}-${hour}-00`
+        });
+        timeSlots.push({
+          time: `${hour.toString().padStart(2, '0')}:30`,
+          available: Math.random() > 0.3, // 70% chance available
+          id: `${day}-${hour}-30`
+        });
+      }
     }
     
     return timeSlots;
@@ -315,12 +361,12 @@ const Property = () => {
         ownerEmail: property.contactEmail || 'owner@example.com',
         ownerPhone: property.contactPhone || 'N/A',
         bookingDate: startDateString,
-        bookingTime: '3:00 PM', // Default check-in time
+        bookingTime: property.checkInTime || '3:00 PM', // Use property's check-in time
         duration: requestedDays * 24 * 60, // Duration in minutes for multiple days
         totalAmount: (property.price || 0) * requestedDays,
         currency: 'PHP',
         guests,
-        specialRequests: `${specialRequests}\n\nBooking Period: ${requestedDays} day${requestedDays > 1 ? 's' : ''} (${startDateString} to ${endDateString})\nCheck-in: 3:00 PM | Checkout: 11:00 AM`
+        specialRequests: `${specialRequests}\n\nBooking Period: ${requestedDays} day${requestedDays > 1 ? 's' : ''} (${startDateString} to ${endDateString})\nCheck-in: ${property.checkInTime || '3:00 PM'} | Checkout: ${property.checkoutTime || '11:00 AM'}`
       };
 
       const result = await createBooking(bookingData);
@@ -339,7 +385,7 @@ const Property = () => {
             year: 'numeric'
           })}\nTime: ${selectedTimeSlot}\n\nYou will receive a confirmation email shortly.`);
         } else {
-          alert(`Booking confirmed!\n\nProperty: ${property.name}\nCheck-in: ${dateRangeText}\nDuration: ${requestedDays} day${requestedDays > 1 ? 's' : ''}\nCheck-in: 3:00 PM | Checkout: 11:00 AM\nTotal: ₱${bookingData.totalAmount.toLocaleString()}\n\nYou will receive a confirmation email shortly.`);
+          alert(`Booking confirmed!\n\nProperty: ${property.name}\nCheck-in: ${dateRangeText}\nDuration: ${requestedDays} day${requestedDays > 1 ? 's' : ''}\nCheck-in: ${property.checkInTime || '3:00 PM'} | Checkout: ${property.checkoutTime || '11:00 AM'}\nTotal: ₱${bookingData.totalAmount.toLocaleString()}\n\nYou will receive a confirmation email shortly.`);
         }
         
         // Close all modals and reset state
@@ -710,15 +756,8 @@ const Property = () => {
 
           </View>
           
-          {/* Availability Calendar - For staycation-friendly rental properties */}
+          {/* Availability Calendar - For all rental properties */}
           {property.propertyType === 'rent' && (
-            // Show booking for properties that are suitable for short-term stays
-            property.type === 'Villa' || 
-            property.type === 'Townhomes' || 
-            property.type === 'House' && property.furnishedStatus === true ||
-            property.type === 'Apartment' && property.furnishedStatus === true ||
-            property.type === 'Condos' && property.furnishedStatus === true
-          ) && (
             <View className="bg-white mb-1 shadow-lg p-6">
               <View className="mb-4">
                 <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability for Booking</Text>
@@ -821,24 +860,24 @@ const Property = () => {
                   </View>
                 </View>
 
-                {/* Staycation Info */}
-                <View className="mt-4 p-3 bg-purple-50 rounded-lg">
+                {/* Rental Info */}
+                <View className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <View className="flex-row items-center mb-2">
-                    <Ionicons name="home" size={16} color="#8B5CF6" />
-                    <Text className="text-purple-600 font-rubik-medium ml-2 text-sm">Perfect for Staycation</Text>
+                    <Ionicons name="home" size={16} color="#3B82F6" />
+                    <Text className="text-blue-600 font-rubik-medium ml-2 text-sm">Rental Property</Text>
                   </View>
                   <Text className="text-gray-600 font-rubik text-sm mb-2">
-                    {property.type} - Ideal for weekend getaways, family vacations, and tourist stays
+                    {property.type} - Available for rental booking
                   </Text>
                   <View className="flex-row items-center">
-                    <Ionicons name="calendar" size={14} color="#8B5CF6" />
+                    <Ionicons name="calendar" size={14} color="#3B82F6" />
                     <Text className="text-gray-600 font-rubik text-xs ml-2">
-                      Minimum stay: 2 nights • Perfect for tourists & weekend trips
+                      Select your preferred dates for booking
                     </Text>
                   </View>
                   {property.furnishedStatus && (
                     <View className="flex-row items-center mt-2">
-                      <Ionicons name="checkmark-circle" size={14} color="#8B5CF6" />
+                      <Ionicons name="checkmark-circle" size={14} color="#3B82F6" />
                       <Text className="text-gray-600 font-rubik text-xs ml-2">
                         Fully furnished • Ready for immediate stay
                       </Text>
@@ -956,14 +995,8 @@ const Property = () => {
           )}
 
 
-          {/* Basic Availability Info - For long-term rental properties */}
-          {property.propertyType === 'rent' && !(
-            property.type === 'Villa' || 
-            property.type === 'Townhomes' || 
-            property.type === 'House' && property.furnishedStatus === true ||
-            property.type === 'Apartment' && property.furnishedStatus === true ||
-            property.type === 'Condos' && property.furnishedStatus === true
-          ) && (
+          {/* Basic Availability Info - For long-term rental properties (removed since calendar now shows for all rentals) */}
+          {false && property.propertyType === 'rent' && (
             <View className="bg-white mb-1 shadow-lg p-6">
               <View className="mb-4">
                 <Text className="text-lg font-rubik-bold text-gray-900 mb-4">Availability</Text>
@@ -1327,12 +1360,12 @@ const Property = () => {
                 <View className="mb-4">
                   <Text className="text-gray-900 font-rubik-bold text-base mb-3">Check-in & Checkout Times</Text>
               
-              <View className="flex-row justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
+                  <View className="flex-row justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
                 <View className="flex-row items-center">
                   <Ionicons name="log-in" size={16} color="#10B981" />
                   <Text className="text-gray-700 font-rubik-medium ml-2">Check-in</Text>
                 </View>
-                <Text className="text-gray-900 font-rubik-bold">3:00 PM</Text>
+                <Text className="text-gray-900 font-rubik-bold">{property?.checkInTime || '3:00 PM'}</Text>
               </View>
               
               <View className="flex-row justify-between items-center p-3 bg-gray-50 rounded-lg">
@@ -1340,7 +1373,7 @@ const Property = () => {
                   <Ionicons name="log-out" size={16} color="#EF4444" />
                   <Text className="text-gray-700 font-rubik-medium ml-2">Checkout</Text>
                 </View>
-                <Text className="text-gray-900 font-rubik-bold">11:00 AM</Text>
+                <Text className="text-gray-900 font-rubik-bold">{property?.checkoutTime || '11:00 AM'}</Text>
               </View>
             </View>
 
@@ -1522,7 +1555,7 @@ const Property = () => {
                   <View className="flex-row items-center mb-2">
                     <Ionicons name="time" size={16} color="#3B82F6" />
                     <Text className="text-gray-600 font-rubik ml-2">
-                      {requestedDays} day{requestedDays > 1 ? 's' : ''} • Check-in: 3:00 PM • Checkout: 11:00 AM
+                      {requestedDays} day{requestedDays > 1 ? 's' : ''} • Check-in: {property?.checkInTime || '3:00 PM'} • Checkout: {property?.checkoutTime || '11:00 AM'}
                     </Text>
                   </View>
                   

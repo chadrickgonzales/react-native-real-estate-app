@@ -514,12 +514,24 @@ export async function getPropertyById({ id }: { id: string }) {
       }
     }
 
+    // Parse viewingTimeSlots if they exist as JSON string
+    let parsedViewingTimeSlots: string[] = [];
+    if (property.viewingTimeSlots) {
+      try {
+        parsedViewingTimeSlots = JSON.parse(property.viewingTimeSlots);
+      } catch {
+        // If parsing fails, treat as empty array
+        parsedViewingTimeSlots = [];
+      }
+    }
+
     return {
       ...property,
       agent: resolvedAgent,
       gallery: resolvedGallery,
       reviews: resolvedReviews,
       images: parsedImages, // Add parsed images array
+      viewingTimeSlots: parsedViewingTimeSlots, // Add parsed viewing time slots
       reviewsCount:
         Array.isArray(resolvedReviews) && resolvedReviews.length > 0
           ? resolvedReviews.length
@@ -1011,6 +1023,18 @@ export async function createProperty(propertyData: any) {
         propertyOwnerId: currentUser.$id, // Always use current user ID from users collection
         ownerId: currentUser.$id, // Always use current user ID from users collection
         ownerName: currentUser.userName || "Property Owner", // Always use current user name
+        
+        // Availability fields for calendar functionality
+        viewingStartDate: propertyData.viewingStartDate || "",
+        viewingEndDate: propertyData.viewingEndDate || "",
+        viewingTimeSlots: propertyData.viewingTimeSlots ? JSON.stringify(propertyData.viewingTimeSlots) : "",
+        rentalStartDate: propertyData.rentalStartDate || "",
+        rentalEndDate: propertyData.rentalEndDate || "",
+        checkInTime: propertyData.checkInTime || "",
+        checkoutTime: propertyData.checkoutTime || "",
+        rentalPeriod: propertyData.rentalPeriod || "",
+        minimumStay: propertyData.minimumStay || 1,
+        maximumStay: propertyData.maximumStay || 30,
       }
     );
 

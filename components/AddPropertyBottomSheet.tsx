@@ -2,6 +2,7 @@ import { categories } from "@/constants/data";
 import images from "@/constants/images";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from "react";
 import {
@@ -102,6 +103,21 @@ interface PropertyData {
   utilitiesIncluded?: boolean;
   smokingAllowed?: boolean;
   backgroundCheckRequired?: boolean;
+  
+  // Availability management fields
+  // For sale properties (viewing availability)
+  viewingStartDate?: string;
+  viewingEndDate?: string;
+  viewingTimeSlots?: string[]; // e.g., ["9:00 AM", "2:00 PM", "4:00 PM"]
+  
+  // For rental properties (booking availability)
+  rentalStartDate?: string;
+  rentalEndDate?: string;
+  checkInTime?: string; // e.g., "3:00 PM"
+  checkoutTime?: string; // e.g., "11:00 AM"
+  rentalPeriod?: 'weekend' | 'multiple_days' | 'weeks' | 'months' | 'year';
+  minimumStay?: number; // minimum nights/days
+  maximumStay?: number; // maximum nights/days
 }
 
 const AddPropertyBottomSheet = ({
@@ -111,6 +127,7 @@ const AddPropertyBottomSheet = ({
 }: AddPropertyBottomSheetProps) => {
   const { user } = useGlobalContext();
   const [currentStep, setCurrentStep] = useState(1);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [propertyData, setPropertyData] = useState<PropertyData>({
     propertyType: '',
     title: "",
@@ -154,6 +171,18 @@ const AddPropertyBottomSheet = ({
     utilitiesIncluded: false,
     smokingAllowed: false,
     backgroundCheckRequired: false,
+    
+    // Availability management fields
+    viewingStartDate: "",
+    viewingEndDate: "",
+    viewingTimeSlots: [],
+    rentalStartDate: "",
+    rentalEndDate: "",
+    checkInTime: "3:00 PM",
+    checkoutTime: "11:00 AM",
+    rentalPeriod: 'multiple_days' as 'weekend' | 'multiple_days' | 'weeks' | 'months' | 'year',
+    minimumStay: 1,
+    maximumStay: 30,
   });
 
   const [errors, setErrors] = useState<Partial<PropertyData>>({});
@@ -272,7 +301,7 @@ const AddPropertyBottomSheet = ({
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      if (currentStep < 5) {
+      if (currentStep < 6) {
         setCurrentStep(currentStep + 1);
       } else {
         handleSubmit();
@@ -1596,6 +1625,452 @@ const AddPropertyBottomSheet = ({
     </View>
   );
 
+  const renderStep6 = () => {
+    const isSelling = propertyData.propertyType === 'sell';
+    const isRenting = propertyData.propertyType === 'rent';
+
+    // Calendar helper functions
+    const getDaysInMonth = (date: Date) => {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startingDayOfWeek = firstDay.getDay();
+      
+      return { daysInMonth, startingDayOfWeek };
+    };
+
+    const generateCalendarDays = (date: Date) => {
+      const { daysInMonth, startingDayOfWeek } = getDaysInMonth(date);
+      const days = [];
+      
+      // Add empty cells for days before the first day of the month
+      for (let i = 0; i < startingDayOfWeek; i++) {
+        days.push(null);
+      }
+      
+      // Add days of the month
+      for (let day = 1; day <= daysInMonth; day++) {
+        days.push(day);
+      }
+      
+      return days;
+    };
+
+    const isDateSelected = (day: number, month: Date, type: 'start' | 'end') => {
+      if (!day) return false;
+      
+      const date = new Date(month.getFullYear(), month.getMonth(), day);
+      const dateString = date.toISOString().split('T')[0];
+      
+      if (type === 'start') {
+        return isSelling 
+          ? propertyData.viewingStartDate === dateString
+          : propertyData.rentalStartDate === dateString;
+      } else {
+        return isSelling 
+          ? propertyData.viewingEndDate === dateString
+          : propertyData.rentalEndDate === dateString;
+      }
+    };
+
+    const isDateInRange = (day: number, month: Date) => {
+      if (!day) return false;
+      
+      const date = new Date(month.getFullYear(), month.getMonth(), day);
+      const dateString = date.toISOString().split('T')[0];
+      
+      const startDate = isSelling ? propertyData.viewingStartDate : propertyData.rentalStartDate;
+      const endDate = isSelling ? propertyData.viewingEndDate : propertyData.rentalEndDate;
+      
+      if (!startDate || !endDate) return false;
+      
+      return dateString > startDate && dateString < endDate;
+    };
+
+    const handleDateClick = (day: number, month: Date) => {
+      const date = new Date(month.getFullYear(), month.getMonth(), day);
+      const dateString = date.toISOString().split('T')[0];
+      
+      if (isSelling) {
+        if (!propertyData.viewingStartDate || (propertyData.viewingStartDate && propertyData.viewingEndDate)) {
+          // Set start date
+          setPropertyData(prev => ({ 
+            ...prev, 
+            viewingStartDate: dateString,
+            viewingEndDate: ""
+          }));
+        } else if (propertyData.viewingStartDate && !propertyData.viewingEndDate) {
+          // Set end date
+          if (dateString > propertyData.viewingStartDate) {
+            setPropertyData(prev => ({ ...prev, viewingEndDate: dateString }));
+          } else {
+            // If selected date is before start date, make it the new start date
+            setPropertyData(prev => ({ 
+              ...prev, 
+              viewingStartDate: dateString,
+              viewingEndDate: ""
+            }));
+          }
+        }
+      } else {
+        if (!propertyData.rentalStartDate || (propertyData.rentalStartDate && propertyData.rentalEndDate)) {
+          // Set start date
+          setPropertyData(prev => ({ 
+            ...prev, 
+            rentalStartDate: dateString,
+            rentalEndDate: ""
+          }));
+        } else if (propertyData.rentalStartDate && !propertyData.rentalEndDate) {
+          // Set end date
+          if (dateString > propertyData.rentalStartDate) {
+            setPropertyData(prev => ({ ...prev, rentalEndDate: dateString }));
+          } else {
+            // If selected date is before start date, make it the new start date
+            setPropertyData(prev => ({ 
+              ...prev, 
+              rentalStartDate: dateString,
+              rentalEndDate: ""
+            }));
+          }
+        }
+      }
+    };
+
+    const navigateMonth = (direction: 'prev' | 'next') => {
+      const newMonth = new Date(currentMonth);
+      if (direction === 'prev') {
+        newMonth.setMonth(newMonth.getMonth() - 1);
+      } else {
+        newMonth.setMonth(newMonth.getMonth() + 1);
+      }
+      setCurrentMonth(newMonth);
+    };
+
+    return (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerClassName="pb-6"
+        className="flex-1"
+      >
+        <View className="p-6 space-y-6">
+          <View className="items-center mb-6">
+            <View className="w-16 h-16 bg-purple-100 rounded-full items-center justify-center mb-4">
+              <Ionicons name="calendar" size={32} color="#8B5CF6" />
+            </View>
+            <Text className="text-2xl font-rubik-bold text-black mb-2">
+              Set Availability
+            </Text>
+            <Text className="text-base font-rubik text-gray-600 text-center">
+              {isSelling 
+                ? "Select dates when your property is available for viewing"
+                : "Select your rental availability period"
+              }
+            </Text>
+          </View>
+
+          {/* Calendar for Date Selection */}
+          <View className="bg-white rounded-2xl p-4 shadow-sm">
+            <Text className="text-lg font-rubik-bold text-black mb-4">
+              {isSelling ? "Viewing Availability Period" : "Rental Availability Period"}
+            </Text>
+            
+            {/* Calendar Header */}
+            <View className="flex-row items-center justify-between mb-4">
+              <TouchableOpacity 
+                onPress={() => navigateMonth('prev')}
+                className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center"
+              >
+                <Ionicons name="chevron-back" size={16} color="#6B7280" />
+              </TouchableOpacity>
+              
+              <Text className="text-gray-900 font-rubik-bold text-lg">
+                {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </Text>
+              
+              <TouchableOpacity 
+                onPress={() => navigateMonth('next')}
+                className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center"
+              >
+                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Calendar Grid */}
+            <View className="bg-gray-50 rounded-lg p-3">
+              {/* Day Headers */}
+              <View className="flex-row mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <View key={day} className="flex-1 items-center py-2">
+                    <Text className="text-gray-500 font-rubik-medium text-xs">{day}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Calendar Days */}
+              <View className="flex-row flex-wrap">
+                {generateCalendarDays(currentMonth).map((day, index) => {
+                  const isStart = day ? isDateSelected(day, currentMonth, 'start') : false;
+                  const isEnd = day ? isDateSelected(day, currentMonth, 'end') : false;
+                  const isInRange = day ? isDateInRange(day, currentMonth) : false;
+                  const isPast = day ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day) < new Date() : false;
+                  
+                  return (
+                    <View key={index} className="w-[14.28%] aspect-square items-center justify-center">
+                      {day ? (
+                        <TouchableOpacity 
+                          onPress={() => !isPast && handleDateClick(day, currentMonth)}
+                          className={`w-8 h-8 rounded-full items-center justify-center ${
+                            isPast 
+                              ? 'bg-gray-200' 
+                              : isStart || isEnd
+                              ? 'bg-blue-500'
+                              : isInRange
+                              ? 'bg-blue-200'
+                              : 'bg-white border border-gray-300'
+                          }`}
+                          disabled={isPast}
+                        >
+                          <Text className={`font-rubik text-sm ${
+                            isPast 
+                              ? 'text-gray-400' 
+                              : isStart || isEnd
+                              ? 'text-white'
+                              : isInRange
+                              ? 'text-blue-800'
+                              : 'text-gray-700'
+                          }`}>
+                            {day}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View className="w-8 h-8" />
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Legend */}
+            <View className="flex-row justify-center mt-4 space-x-4">
+              <View className="flex-row items-center">
+                <View className="w-3 h-3 bg-blue-500 rounded-full mr-2" />
+                <Text className="text-gray-600 font-rubik text-xs">Selected</Text>
+              </View>
+              <View className="flex-row items-center">
+                <View className="w-3 h-3 bg-blue-200 rounded-full mr-2" />
+                <Text className="text-gray-600 font-rubik text-xs">Range</Text>
+              </View>
+              <View className="flex-row items-center">
+                <View className="w-3 h-3 bg-gray-200 rounded-full mr-2" />
+                <Text className="text-gray-600 font-rubik text-xs">Past</Text>
+              </View>
+            </View>
+
+            {/* Selected Dates Display */}
+            {(isSelling ? propertyData.viewingStartDate : propertyData.rentalStartDate) && (
+              <View className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <Text className="text-blue-800 font-rubik-bold text-sm mb-1">Selected Period</Text>
+                <Text className="text-blue-700 font-rubik text-sm">
+                  From: {isSelling ? propertyData.viewingStartDate : propertyData.rentalStartDate}
+                </Text>
+                {(isSelling ? propertyData.viewingEndDate : propertyData.rentalEndDate) && (
+                  <Text className="text-blue-700 font-rubik text-sm">
+                    To: {isSelling ? propertyData.viewingEndDate : propertyData.rentalEndDate}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* For Sale Properties - Viewing Time Slots */}
+          {isSelling && (
+            <View className="bg-white rounded-2xl p-4 shadow-sm">
+              <Text className="text-lg font-rubik-bold text-black mb-3">Available Viewing Times</Text>
+              <Text className="text-sm font-rubik text-gray-600 mb-4">
+                Select the time slots when you're available for property viewings
+              </Text>
+              
+              <View className="space-y-3">
+                {[
+                  { time: "9:00 AM", label: "Morning" },
+                  { time: "12:00 PM", label: "Lunch" },
+                  { time: "2:00 PM", label: "Afternoon" },
+                  { time: "4:00 PM", label: "Evening" },
+                  { time: "6:00 PM", label: "Late Evening" }
+                ].map((slot) => (
+                  <TouchableOpacity
+                    key={slot.time}
+                    onPress={() => {
+                      const currentSlots = propertyData.viewingTimeSlots || [];
+                      const isSelected = currentSlots.includes(slot.time);
+                      const newSlots = isSelected 
+                        ? currentSlots.filter(t => t !== slot.time)
+                        : [...currentSlots, slot.time];
+                      setPropertyData(prev => ({ ...prev, viewingTimeSlots: newSlots }));
+                    }}
+                    className={`flex-row items-center justify-between p-4 rounded-xl border ${
+                      propertyData.viewingTimeSlots?.includes(slot.time)
+                        ? 'bg-blue-50 border-blue-200'
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <View className="flex-row items-center">
+                      <View className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                        propertyData.viewingTimeSlots?.includes(slot.time)
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-400'
+                      }`}>
+                        {propertyData.viewingTimeSlots?.includes(slot.time) && (
+                          <View className="w-2 h-2 rounded-full bg-white m-0.5" />
+                        )}
+                      </View>
+                      <View>
+                        <Text className="text-base font-rubik-bold text-gray-900">{slot.time}</Text>
+                        <Text className="text-sm font-rubik text-gray-600">{slot.label}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* For Rental Properties - Additional Settings */}
+          {isRenting && (
+            <View className="space-y-6">
+
+              {/* Check-in/Checkout Times */}
+              <View className="bg-white rounded-2xl p-4 shadow-sm">
+                <Text className="text-lg font-rubik-bold text-black mb-3">Check-in & Checkout Times</Text>
+                <View className="space-y-4">
+                  <View>
+                    <Text className="text-sm font-rubik-medium text-gray-700 mb-2">Check-in Time</Text>
+                    <TextInput
+                      className="bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 font-rubik"
+                      placeholder="3:00 PM"
+                      value={propertyData.checkInTime}
+                      onChangeText={(text) => setPropertyData(prev => ({ ...prev, checkInTime: text }))}
+                    />
+                  </View>
+                  <View>
+                    <Text className="text-sm font-rubik-medium text-gray-700 mb-2">Checkout Time</Text>
+                    <TextInput
+                      className="bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 font-rubik"
+                      placeholder="11:00 AM"
+                      value={propertyData.checkoutTime}
+                      onChangeText={(text) => setPropertyData(prev => ({ ...prev, checkoutTime: text }))}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Rental Period Options */}
+              <View className="bg-white rounded-2xl p-4 shadow-sm">
+                <Text className="text-lg font-rubik-bold text-black mb-3">Rental Period Options</Text>
+                <Text className="text-sm font-rubik text-gray-600 mb-4">
+                  Choose what type of rentals you want to allow
+                </Text>
+                
+                <View className="space-y-3">
+                  {[
+                    { value: 'weekend', label: 'Weekend Only', description: 'Friday to Sunday' },
+                    { value: 'multiple_days', label: 'Multiple Days', description: '2-7 days' },
+                    { value: 'weeks', label: 'Weekly', description: '1-4 weeks' },
+                    { value: 'months', label: 'Monthly', description: '1-12 months' },
+                    { value: 'year', label: 'Yearly', description: 'Long-term rental' }
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      onPress={() => setPropertyData(prev => ({ ...prev, rentalPeriod: option.value as any }))}
+                      className={`flex-row items-center justify-between p-4 rounded-xl border ${
+                        propertyData.rentalPeriod === option.value
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <View className="flex-row items-center">
+                        <View className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                          propertyData.rentalPeriod === option.value
+                            ? 'border-green-500 bg-green-500'
+                            : 'border-gray-400'
+                        }`}>
+                          {propertyData.rentalPeriod === option.value && (
+                            <View className="w-2 h-2 rounded-full bg-white m-0.5" />
+                          )}
+                        </View>
+                        <View>
+                          <Text className="text-base font-rubik-bold text-gray-900">{option.label}</Text>
+                          <Text className="text-sm font-rubik text-gray-600">{option.description}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Stay Duration Limits */}
+              <View className="bg-white rounded-2xl p-4 shadow-sm">
+                <Text className="text-lg font-rubik-bold text-black mb-3">Stay Duration Limits</Text>
+                <View className="space-y-4">
+                  <View>
+                    <Text className="text-sm font-rubik-medium text-gray-700 mb-2">Minimum Stay (nights)</Text>
+                    <TextInput
+                      className="bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 font-rubik"
+                      placeholder="1"
+                      value={propertyData.minimumStay?.toString()}
+                      onChangeText={(text) => setPropertyData(prev => ({ ...prev, minimumStay: parseInt(text) || 1 }))}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View>
+                    <Text className="text-sm font-rubik-medium text-gray-700 mb-2">Maximum Stay (nights)</Text>
+                    <TextInput
+                      className="bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 font-rubik"
+                      placeholder="30"
+                      value={propertyData.maximumStay?.toString()}
+                      onChangeText={(text) => setPropertyData(prev => ({ ...prev, maximumStay: parseInt(text) || 30 }))}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Summary */}
+          <View className="bg-blue-50 rounded-2xl p-4 shadow-sm">
+            <Text className="text-base font-rubik-bold text-blue-800 mb-2">Availability Summary</Text>
+            {isSelling ? (
+              <View>
+                <Text className="text-sm font-rubik text-blue-700">
+                  Viewing available from {propertyData.viewingStartDate || 'Not set'} to {propertyData.viewingEndDate || 'Not set'}
+                </Text>
+                <Text className="text-sm font-rubik text-blue-700">
+                  Time slots: {propertyData.viewingTimeSlots?.length || 0} selected
+                </Text>
+              </View>
+            ) : (
+              <View>
+                <Text className="text-sm font-rubik text-blue-700">
+                  Rental available from {propertyData.rentalStartDate || 'Not set'} to {propertyData.rentalEndDate || 'Not set'}
+                </Text>
+                <Text className="text-sm font-rubik text-blue-700">
+                  Check-in: {propertyData.checkInTime} | Checkout: {propertyData.checkoutTime}
+                </Text>
+                <Text className="text-sm font-rubik text-blue-700">
+                  Period: {propertyData.rentalPeriod?.replace('_', ' ')} | Stay: {propertyData.minimumStay}-{propertyData.maximumStay} nights
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
   if (!visible) return null;
 
   return (
@@ -1614,7 +2089,7 @@ const AddPropertyBottomSheet = ({
         style={{ backgroundColor: 'rgba(0,0,0,0.5)', opacity: backdropOpacity }}
       >
         <Animated.View
-          className="bg-background-100 rounded-t-3xl"
+          className="rounded-t-3xl"
           style={{
             height: animatedHeight,
             marginBottom: 90,
@@ -1622,6 +2097,10 @@ const AddPropertyBottomSheet = ({
             marginHorizontal: sheetHorizontalMargin,
           }}
         >
+          <LinearGradient
+            colors={['#F0F9F4', '#E8F5E8', '#F0F9F4']}
+            style={{ flex: 1, borderRadius: 24 }}
+          >
           {/* Header */}
           <View className="p-6 border-b border-gray-200">
             <View className="flex-row items-center justify-between mb-4">
@@ -1634,8 +2113,8 @@ const AddPropertyBottomSheet = ({
               </TouchableOpacity>
             </View>
             
-            {/* Submit Button - Only show on Step 5 */}
-            {currentStep === 5 && (
+            {/* Submit Button - Only show on Step 6 */}
+            {currentStep === 6 && (
               <View className="mb-4">
                 <TouchableOpacity
                   className={`w-full py-3 rounded-xl ${
@@ -1653,7 +2132,7 @@ const AddPropertyBottomSheet = ({
             
             {/* Progress Steps */}
             <View className="flex-row items-center justify-center">
-              {[1, 2, 3, 4, 5].map((step) => (
+              {[1, 2, 3, 4, 5, 6].map((step) => (
                 <View key={step} className="flex-row items-center">
                   <View
                     className={`w-8 h-8 rounded-full items-center justify-center ${
@@ -1714,8 +2193,10 @@ const AddPropertyBottomSheet = ({
 
           {currentStep === 5 && renderStep5()}
 
+          {currentStep === 6 && renderStep6()}
+
           {/* Bottom Action Bar */}
-          {currentStep > 1 && currentStep < 5 && (
+          {currentStep > 1 && currentStep < 6 && (
             <View className="p-6 border-t border-gray-200 pb-16">
               <View className="flex-row space-x-3 gap-2">
                 <TouchableOpacity
@@ -1728,16 +2209,17 @@ const AddPropertyBottomSheet = ({
                 </TouchableOpacity>
                 <TouchableOpacity
                   className={`${isUploading ? 'bg-blue-400' : 'bg-blue-600'} flex-1 py-4 rounded-full`}
-                  onPress={currentStep === 5 ? handleSubmit : handleNext}
+                  onPress={currentStep === 6 ? handleSubmit : handleNext}
                   disabled={isUploading}
                 >
                   <Text className="text-center text-white font-rubik-bold">
-                    {isUploading ? "Uploading..." : "Next"}
+                    {isUploading ? "Uploading..." : currentStep === 6 ? "Submit Property" : "Next"}
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
+          </LinearGradient>
         </Animated.View>
       </Animated.View>
     </View>
