@@ -1096,6 +1096,7 @@ export interface Message {
   text: string;
   timestamp: string;
   isRead: boolean;
+  readBy?: string; // JSON string containing read receipt data
   createdAt: string;
 }
 
@@ -1455,7 +1456,9 @@ export async function getUserChats(userId: string) {
 }
 
 // Mark messages as read
-export async function markMessagesAsRead(chatId: string, userId: string) {
+export async function markMessagesAsRead(chatId: string, userId: string, userName?: string, userAvatar?: string) {
+  console.log('🔍 markMessagesAsRead called with:', { chatId, userId, userName, userAvatar });
+  
   try {
     // Validate parameters
     if (!chatId || chatId.trim() === "") {
@@ -1485,17 +1488,61 @@ export async function markMessagesAsRead(chatId: string, userId: string) {
       ]
     );
 
-    // Mark each message as read
-    const updatePromises = unreadMessages.documents.map(message =>
-      databases.updateDocument(
-        config.databaseId!,
-        config.messagesCollectionId!,
-        message.$id,
-        { isRead: true }
-      )
-    );
+    // Mark each message as read and add read receipt
+    const updatePromises = unreadMessages.documents.map(async message => {
+      console.log('📖 Processing message for read receipt:', {
+        messageId: message.$id,
+        senderId: message.senderId,
+        currentUserId: userId,
+        isRead: message.isRead,
+        readBy: message.readBy
+      });
 
-    await Promise.all(updatePromises);
+      // Parse existing readBy JSON string or initialize empty array
+      let currentReadBy = [];
+      try {
+        currentReadBy = message.readBy ? JSON.parse(message.readBy) : [];
+      } catch (error) {
+        console.warn('Error parsing readBy JSON:', error);
+        currentReadBy = [];
+      }
+
+      const readReceipt = {
+        userId,
+        userName: userName || "User",
+        userAvatar: userAvatar || "",
+        readAt: new Date().toISOString(),
+      };
+
+      // Check if user already read this message
+      const alreadyRead = currentReadBy.some((read: any) => read.userId === userId);
+      
+      console.log('📋 Read receipt info:', {
+        alreadyRead,
+        currentReadByLength: currentReadBy.length,
+        newReadReceipt: readReceipt
+      });
+      
+      if (!alreadyRead) {
+        const updatedReadBy = [...currentReadBy, readReceipt];
+        console.log('💾 Updating message with read receipt:', {
+          messageId: message.$id,
+          updatedReadBy: JSON.stringify(updatedReadBy)
+        });
+        
+        return databases.updateDocument(
+          config.databaseId!,
+          config.messagesCollectionId!,
+          message.$id,
+          { 
+            isRead: true,
+            readBy: JSON.stringify(updatedReadBy)
+          }
+        );
+      }
+    });
+
+    await Promise.all(updatePromises.filter(Boolean));
   } catch (error: any) {
     console.error("Error marking messages as read:", {
       message: error.message,
