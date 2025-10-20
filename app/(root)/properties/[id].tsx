@@ -81,6 +81,25 @@ const Property = () => {
     return days;
   };
 
+  const generateTimeSlots = (day: number) => {
+    const timeSlots = [];
+    const startHour = 9;
+    const endHour = 17;
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        timeSlots.push({
+          time: timeString,
+          available: true,
+          day: day
+        });
+      }
+    }
+    
+    return timeSlots;
+  };
+
   const isDateAvailable = (day: number, month: Date) => {
     if (!day) return false;
     
@@ -303,14 +322,45 @@ const Property = () => {
       endDate.setDate(startDate.getDate() + requestedDays - 1);
       const endDateString = `${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')}`;
       
-      // Create the booking
+      // Create the booking with fallback image
+      const propertyImageUrl = property.images?.[0] || 
+                               property.image || 
+                               "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=600&fit=crop"; // Default property image
+      
+      console.log('Property image data:', {
+        images: property.images,
+        image: property.image,
+        selectedImage: propertyImageUrl,
+        propertyId: property.$id,
+        propertyName: property.name
+      });
+      
+      // Additional debugging for property structure
+      console.log('Full property object keys:', Object.keys(property));
+      console.log('Property image fields:', {
+        'property.image': property.image,
+        'property.images': property.images,
+        'property.images[0]': property.images?.[0],
+        'property.images length': property.images?.length
+      });
+      
+      // Use the same logic as getPropertyOwner to ensure consistent seller ID
+      const propertyOwnerId = property.ownerId || property.propertyOwnerId || 'unknown';
+      
+      console.log('Property owner ID consistency check:', {
+        'property.ownerId': property.ownerId,
+        'property.propertyOwnerId': property.propertyOwnerId,
+        'selected propertyOwnerId': propertyOwnerId,
+        'property name': property.name
+      });
+      
       const bookingData = {
         userId: user.$id,
         propertyId: property.$id,
         propertyName: property.name || 'Property',
         propertyAddress: property.address || 'Address not specified',
-        propertyImage: property.images?.[0] || property.image || '',
-        ownerId: property.ownerId || 'unknown',
+        propertyImage: propertyImageUrl,
+        ownerId: propertyOwnerId,
         ownerName: property.ownerName || 'Property Owner',
         ownerEmail: property.contactEmail || 'owner@example.com',
         ownerPhone: property.contactPhone || 'N/A',
@@ -654,6 +704,9 @@ const Property = () => {
                           propertyName: property?.name || 'Property',
                           sellerName: 'Property Owner',
                           sellerAvatar: property?.image,
+                          propertyImage: property?.images?.[0] || 
+                                        property?.image || 
+                                        "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=600&fit=crop",
                           initialMessage: messageText
                         }
                       });

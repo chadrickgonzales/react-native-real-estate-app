@@ -98,6 +98,16 @@ const ChatList = () => {
       return item.propertyName || 'Property';
     };
 
+    // Debug chat item data
+    console.log('Chat item data:', {
+      id: item.$id,
+      propertyId: item.propertyId,
+      propertyName: item.propertyName,
+      propertyImage: item.propertyImage,
+      sellerAvatar: item.sellerAvatar,
+      sellerName: item.sellerName
+    });
+
     return (
       <TouchableOpacity
         className="flex-row items-center bg-white rounded-2xl pt-2 pb-2 pl-2 pr-4 mb-3 border border-gray-100"
@@ -109,14 +119,20 @@ const ChatList = () => {
             propertyName: item.propertyName,
             sellerName: item.sellerName,
             sellerAvatar: item.sellerAvatar,
+            propertyImage: item.propertyImage || item.sellerAvatar || '',
           }
         })}
       >
         <View className="mr-3">
           <Image
-            source={images.newYork}
+            source={
+              item.propertyImage 
+                ? { uri: item.propertyImage }
+                : images.newYork
+            }
             className="w-16 h-16 rounded-md"
             resizeMode="cover"
+            onError={() => console.log('Chat list property image failed to load:', item.propertyImage)}
           />
         </View>
         

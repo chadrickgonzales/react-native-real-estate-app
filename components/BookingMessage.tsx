@@ -38,6 +38,13 @@ export default function BookingMessage({
   const [latestBooking, setLatestBooking] = useState(booking)
   const [loading, setLoading] = useState(false)
 
+  // Debug logging for property image
+  console.log('BookingMessage - Property image data:', {
+    propertyImage: booking.propertyImage,
+    propertyName: booking.propertyName,
+    bookingId: booking.$id
+  });
+
   // Fetch latest booking data from database
   const fetchLatestBooking = async () => {
     try {
@@ -156,11 +163,20 @@ export default function BookingMessage({
 
       {/* Property Image */}
       <View className="mb-4">
-        <Image
-          source={createImageSource(currentBooking.propertyImage)}
-          className="w-full h-32 rounded-xl"
-          resizeMode="cover"
-        />
+        {currentBooking.propertyImage ? (
+          <Image
+            source={createImageSource(currentBooking.propertyImage)}
+            className="w-full h-32 rounded-xl"
+            resizeMode="cover"
+            onError={() => console.log('Property image failed to load:', currentBooking.propertyImage)}
+            onLoad={() => console.log('Property image loaded successfully:', currentBooking.propertyImage)}
+          />
+        ) : (
+          <View className="w-full h-32 rounded-xl bg-gray-200 items-center justify-center">
+            <Ionicons name="home-outline" size={48} color="#9CA3AF" />
+            <Text className="text-gray-500 font-rubik text-sm mt-2">No Image Available</Text>
+          </View>
+        )}
       </View>
 
       {/* Property Details */}

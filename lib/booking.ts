@@ -68,6 +68,20 @@ export async function createBooking({
   specialRequests?: string;
 }) {
   try {
+    console.log('Creating booking with propertyImage:', propertyImage);
+    console.log('Full booking data:', {
+      userId,
+      propertyId,
+      propertyName,
+      propertyAddress,
+      propertyImage,
+      ownerId,
+      ownerName,
+      bookingDate,
+      bookingTime,
+      totalAmount
+    });
+
     const booking = await databases.createDocument(
       process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
       "bookings",
@@ -94,6 +108,9 @@ export async function createBooking({
         updatedAt: new Date().toISOString(),
       }
     );
+
+    console.log('Booking created successfully:', booking.$id);
+    console.log('Booking propertyImage field:', booking.propertyImage);
 
     // Send booking notification to chat
     try {
@@ -297,6 +314,8 @@ export async function isTimeSlotAvailable(propertyId: string, date: string, time
 export async function sendBookingNotification(booking: Booking, buyerName: string) {
   try {
     // Create or get chat between buyer and property owner
+    console.log('Creating booking notification chat with sellerId:', booking.ownerId);
+    
     const chat = await createOrGetChat({
       propertyId: booking.propertyId,
       buyerId: booking.userId,
@@ -304,9 +323,11 @@ export async function sendBookingNotification(booking: Booking, buyerName: strin
       propertyName: booking.propertyName,
       sellerName: booking.ownerName,
       sellerAvatar: "", // You can add seller avatar later
+      propertyImage: booking.propertyImage,
     });
 
     // Create booking notification message
+    console.log('Creating booking notification with propertyImage:', booking.propertyImage);
     const bookingNotification = {
       $id: booking.$id,
       propertyId: booking.propertyId,
@@ -325,14 +346,19 @@ export async function sendBookingNotification(booking: Booking, buyerName: strin
       senderId: booking.userId,
       senderName: buyerName
     };
+    
+    console.log('Booking notification data:', bookingNotification);
 
-    // Send the booking notification as a special message
+    // Send the booking notification as a clean message with booking ID
+    const messageText = `Booking for: ${booking.propertyName}|${booking.$id}`;
+    console.log('🚀 CLEAN FORMAT - Sending booking message:', messageText);
+    
     await sendMessage({
       chatId: chat.$id,
       senderId: booking.userId,
       senderName: buyerName,
       senderAvatar: "",
-      text: `BOOKING_REQUEST:${JSON.stringify(bookingNotification)}`
+      text: messageText
     });
 
     return { success: true, chatId: chat.$id };

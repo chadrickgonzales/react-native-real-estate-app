@@ -508,11 +508,22 @@ export async function getPropertyById({ id }: { id: string }) {
     if (property.images) {
       try {
         parsedImages = JSON.parse(property.images);
+        console.log('Parsed images from JSON:', parsedImages);
       } catch {
         // If parsing fails, treat as single image URL
         parsedImages = [property.images];
+        console.log('Treated images as single URL:', parsedImages);
       }
+    } else {
+      console.log('No images field found in property');
     }
+
+    console.log('Property image processing:', {
+      'property.image': property.image,
+      'property.images (raw)': property.images,
+      'parsedImages': parsedImages,
+      'parsedImages.length': parsedImages.length
+    });
 
     // Parse viewingTimeSlots if they exist as JSON string
     let parsedViewingTimeSlots: string[] = [];
@@ -525,7 +536,7 @@ export async function getPropertyById({ id }: { id: string }) {
       }
     }
 
-    return {
+    const processedProperty = {
       ...property,
       agent: resolvedAgent,
       gallery: resolvedGallery,
@@ -541,6 +552,15 @@ export async function getPropertyById({ id }: { id: string }) {
           ? resolvedGallery.length
           : originalGallery.length,
     };
+
+    console.log('Final processed property image data:', {
+      'processedProperty.image': processedProperty.image,
+      'processedProperty.images': processedProperty.images,
+      'processedProperty.images[0]': processedProperty.images?.[0],
+      'processedProperty.images.length': processedProperty.images?.length
+    });
+
+    return processedProperty;
   } catch (error) {
     console.error(error);
     return null;
@@ -1058,6 +1078,7 @@ export interface Chat {
   sellerId: string;
   propertyName: string;
   propertyAddress?: string;
+  propertyImage?: string;
   sellerName: string;
   sellerAvatar?: string;
   lastMessage?: string;
@@ -1086,6 +1107,7 @@ export async function createOrGetChat({
   propertyName,
   sellerName,
   sellerAvatar,
+  propertyImage,
   initialMessage,
 }: {
   propertyId: string;
@@ -1094,6 +1116,7 @@ export async function createOrGetChat({
   propertyName: string;
   sellerName: string;
   sellerAvatar?: string;
+  propertyImage?: string;
   initialMessage?: string;
 }) {
   try {
@@ -1104,6 +1127,7 @@ export async function createOrGetChat({
       propertyName,
       sellerName,
       sellerAvatar,
+      propertyImage,
       initialMessage
     });
 
@@ -1121,6 +1145,20 @@ export async function createOrGetChat({
     }
 
     // Check if chat already exists
+    console.log("🔍 Checking for existing chats with:", {
+      propertyId,
+      buyerId,
+      sellerId
+    });
+    console.log("🔍 Chat search parameters:", {
+      'propertyId type': typeof propertyId,
+      'buyerId type': typeof buyerId,
+      'sellerId type': typeof sellerId,
+      'propertyId value': propertyId,
+      'buyerId value': buyerId,
+      'sellerId value': sellerId
+    });
+    
     const existingChats = await databases.listDocuments(
       config.databaseId!,
       config.chatsCollectionId!,
@@ -1131,34 +1169,89 @@ export async function createOrGetChat({
       ]
     );
 
+    console.log("🔍 Existing chats found:", existingChats.documents.length);
+    if (existingChats.documents.length > 0) {
+      console.log("📋 Existing chat details:", {
+        chatId: existingChats.documents[0].$id,
+        propertyId: existingChats.documents[0].propertyId,
+        buyerId: existingChats.documents[0].buyerId,
+        sellerId: existingChats.documents[0].sellerId
+      });
+    }
+
     let chat: Chat;
     
     if (existingChats.documents.length > 0) {
       // Chat exists, return it
+      console.log("✅ Using existing chat:", existingChats.documents[0].$id);
       chat = existingChats.documents[0] as unknown as Chat;
     } else {
       // Create new chat
-      const newChat = await databases.createDocument(
-        config.databaseId!,
-        config.chatsCollectionId!,
-        ID.unique(),
-        {
-          propertyId,
-          buyerId,
-          sellerId,
-          propertyName,
-          sellerName,
-          sellerAvatar: sellerAvatar || "",
-          propertyAddress, // Add property address
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-      );
-      chat = newChat as unknown as Chat;
+      const chatData = {
+        propertyId,
+        buyerId,
+        sellerId,
+        propertyName,
+        sellerName,
+        sellerAvatar: sellerAvatar || "",
+        propertyImage: propertyImage || "",
+        propertyAddress, // Add property address
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      console.log("📝 Creating chat with data:", chatData);
+      
+      try {
+        const newChat = await databases.createDocument(
+          config.databaseId!,
+          config.chatsCollectionId!,
+          ID.unique(),
+          chatData
+        );
+        
+        console.log("✅ Chat document created successfully");
+        
+        console.log("Chat created successfully:", {
+          chatId: newChat.$id,
+          propertyImage: newChat.propertyImage,
+          propertyName: newChat.propertyName,
+          propertyId: newChat.propertyId
+        });
+        
+        // Additional debugging - check what was actually stored
+        console.log("🔍 Database response details:", {
+          'newChat.propertyImage': newChat.propertyImage,
+          'newChat.propertyImage type': typeof newChat.propertyImage,
+          'newChat.propertyImage length': newChat.propertyImage?.length,
+          'input propertyImage': propertyImage,
+          'input propertyImage type': typeof propertyImage,
+          'input propertyImage length': propertyImage?.length
+        });
+        
+        chat = newChat as unknown as Chat;
+      } catch (createError) {
+        console.error("❌ Error creating chat document:", createError);
+        console.error("❌ Error details:", {
+          message: createError.message,
+          code: createError.code,
+          type: createError.type
+        });
+        throw createError;
+      }
     }
 
     // If there's an initial message, send it
     if (initialMessage && initialMessage.trim()) {
+      console.log("📤 Sending initial message:", {
+        chatId: chat.$id,
+        senderId: buyerId,
+        senderName: "You",
+        text: initialMessage.trim(),
+        'initialMessage length': initialMessage.length,
+        'initialMessage type': typeof initialMessage
+      });
+      
       await sendMessage({
         chatId: chat.$id,
         senderId: buyerId,
